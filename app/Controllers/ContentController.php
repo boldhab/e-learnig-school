@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Core\Response;
+use App\Services\ContentService;
+use App\Traits\ApiResponseTrait;
+use App\Traits\LoggerTrait;
+use App\Helpers\HtmlSanitizer;
+use App\Core\Validation;
+use App\Middleware\AuthMiddleware;
+use App\Middleware\RoleMiddleware;
+
+class ContentController {
+    use ApiResponseTrait, LoggerTrait;
+
+    protected $contentService;
+    protected $validation;
+
+    public function __construct() {
+        $this->contentService = new ContentService();
+        $this->validation = new Validation();
+        
+        $auth = new AuthMiddleware();
+        $auth->handle(new Request(), new Response());
+    }
+
+    public function upload(Request $request, Response $response) {
+        // Only teachers and admins can upload
+        $user = $GLOBALS['auth_user'];
+        if ($user['role'] === 'STUDENT') {
+            return $this->error('Only teachers can upload materials', 403);
+        }
+
+        $data = HtmlSanitizer::sanitize($request->getBody());
+        $file = $_FILES['material'] ?? null;
+
+        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+            return $this->error('File upload failed or no file provided', 400);
+        }
+
+        if (!$this->validation->validate($data, [
+            'title' => 'required',
+            'subject_id' => 'required',
+            'class_id' => 'required'
+        ])) {
+            return $this->error('Validation failed', 422, $this->validation->getErrors());
+        }
+
+        try {
+            $data['uploaded_by'] = $user['user_id'];
+            $id = $this->contentService->uploadMaterial($data, $file);
+            return $this->success(['material_id' => $id], 'Material uploaded successfully to Cloudinary', 201);
+        } catch (\Exception $e) {
+            $this->logError($e->getMessage());
+            return $this->error($e->getMessage(), 500);
+        }
+    }
+
+    public function listForStudent(Request $request, Response $response) {
+        $user = $GLOBALS['auth_user'];
+        
+        // In a real system, we'd get the student's class_id from their profile
+        // For now, we expect it in the query or from profile if implemented
+        $classId = $request->getBody()['class_id'] ?? null;
+        $subjectId = $request->getBody()['subject_id'] ?? null;
+
+        if (!$classId) {
+            return $this->error('Class ID is required', 400);
+        }
+
+        try {
+            $materials = $this->contentService->getStudentMaterials($classId, $subjectId);
+            return $this->success($materials);
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 500);
+        }
+    }
+
+    public function delete(Request $request, Response $response) {
+        $user = $GLOBALS['auth_user'];
+        $data = $request->getBody();
+        $id = $data['id'] ?? null;
+
+        if (!$id) return $this->error('Material ID required', 400);
+
+        try {
+            $this->contentService->deleteMaterial($id, $user['user_id']);
+            return $this->success([], 'Material deleted successfully');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
+        }
+    }
+}
