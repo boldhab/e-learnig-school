@@ -19,11 +19,13 @@ class SubmissionController extends BaseController {
         $this->requireRole('STUDENT');
         
         $data = HtmlSanitizer::sanitize($request->getBody());
-        $studentId = $GLOBALS['auth_user']['id'];
+        $data['assignment_id'] = $id;
+        $data['student_id'] = $GLOBALS['auth_user']['id'];
+        
         $file = $_FILES['submission_file'] ?? null;
 
         try {
-            $submissionId = $this->submissionService->submitAssignment($id, $studentId, $data, $file);
+            $submissionId = $this->submissionService->submitAssignment($data, $file);
             $this->success(['submission_id' => $submissionId], 'Assignment submitted successfully', 201);
         } catch (Exception $e) {
             $this->error($e->getMessage(), 400);
@@ -32,14 +34,22 @@ class SubmissionController extends BaseController {
 
     public function getSubmissionsByAssignment(Request $request, Response $response, $id) {
         $this->requireRole(['ADMIN', 'TEACHER']);
-        $submissions = $this->submissionService->getSubmissionsForAssignment($id);
-        $response->json($submissions);
+        try {
+            $submissions = $this->submissionService->getAssignmentSubmissions($id);
+            $this->success($submissions);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 
     public function getStudentSubmissions(Request $request, Response $response) {
         $this->requireRole('STUDENT');
-        $studentId = $GLOBALS['auth_user']['id'];
-        $submissions = $this->submissionService->getStudentSubmissions($studentId);
-        $response->json($submissions);
+        try {
+            $studentId = $GLOBALS['auth_user']['id'];
+            $submissions = $this->submissionService->getStudentSubmissions($studentId);
+            $this->success($submissions);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 }

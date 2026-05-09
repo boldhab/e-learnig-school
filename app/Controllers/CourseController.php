@@ -17,14 +17,15 @@ class CourseController extends BaseController {
     public function list(Request $request, Response $response) {
         $this->requireAuth();
         $user = $GLOBALS['auth_user'];
+        $courses = $this->courseService->getUserCourses($user['id'], $user['role_name']);
+        $this->success($courses);
+    }
 
+    public function students(Request $request, Response $response, $id) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
         try {
-            $courses = $this->courseService->getUserCourses(
-                $user['id'],
-                $user['role_name'],
-                $user['class_id'] ?? null
-            );
-            $this->success($courses);
+            $students = $this->courseService->getCourseStudents((int)$id);
+            $this->success($students);
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }

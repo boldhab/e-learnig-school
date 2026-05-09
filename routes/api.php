@@ -50,6 +50,7 @@ $router->post('/api/grades/publish', [\App\Controllers\GradingController::class,
 
 // Course Routes
 $router->get('courses', 'CourseController@list');
+$router->get('courses/{id}/students', 'CourseController@students');
 
 // Material Routes
 $router->get('materials', 'MaterialController@list');
@@ -63,6 +64,17 @@ $router->post('/api/discussions/groups/{id}/topics', [\App\Controllers\Discussio
 $router->get('/api/discussions/topics/{id}/messages', [\App\Controllers\DiscussionController::class, 'listMessages']);
 $router->post('/api/discussions/topics/{id}/messages', [\App\Controllers\DiscussionController::class, 'postMessage']);
 $router->delete('/api/discussions/messages/{id}', [\App\Controllers\DiscussionController::class, 'deleteMessage']);
+
+// Performance & Analytics Routes
+$router->get('performance/student', 'PerformanceController@getStudentData');
+$router->get('performance/course/{id}', 'PerformanceController@getCourseData');
+$router->get('performance/gap-analysis', 'GapAnalysisController@getStudentAnalysis');
+$router->get('performance/risk-report', 'GapAnalysisController@getRiskReport');
+
+// Attendance Routes
+$router->post('attendance/bulk', 'AttendanceController@bulkMark');
+$router->get('attendance/course', 'AttendanceController@getCourseAttendance');
+$router->get('attendance/student', 'AttendanceController@getStudentAttendance');
 $router->post('/api/discussions/topics/{id}/close', [\App\Controllers\DiscussionController::class, 'closeTopic']);
 $router->post('/api/discussions/topics/{id}/open', [\App\Controllers\DiscussionController::class, 'openTopic']);
 $router->get('/api/courses/{id}/discussion', [\App\Controllers\DiscussionController::class, 'getCourseDiscussion']);

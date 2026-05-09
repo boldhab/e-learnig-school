@@ -51,4 +51,20 @@ class CourseRepository {
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Get all courses (Admin only).
+     */
+    public function getStudentsByCourse(int $courseId): array {
+        $sql = "SELECT u.id, u.full_name, u.student_id as student_code, u.class_id
+                FROM users u
+                JOIN teacher_assignments ta ON u.class_id = ta.class_id
+                WHERE ta.course_id = :course_id
+                AND u.role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT')
+                ORDER BY u.full_name ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['course_id' => $courseId]);
+        return $stmt->fetchAll();
+    }
 }

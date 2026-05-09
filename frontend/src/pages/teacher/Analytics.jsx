@@ -1,297 +1,267 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell 
 } from 'recharts';
-import { TrendingUp, Users, Award, Calendar } from 'lucide-react';
+import { 
+  TrendingUp, 
+  Users, 
+  AlertTriangle, 
+  Award, 
+  Loader2, 
+  Filter,
+  ArrowUpRight,
+  Target
+} from 'lucide-react';
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
+import performanceApi from '../../api/modules/performance.api';
+import contentApi from '../../api/modules/content.api';
 
-// Stat Card Component
-const StatCard = ({ icon: Icon, label, value, change, color }) => (
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+
+const StatCard = ({ title, value, icon: Icon, trend, color }) => (
   <motion.div
-    className="bg-white p-6 rounded-xl border"
+    className="bg-white p-6 rounded-2xl border shadow-sm"
     style={{ borderColor: TEACHER_COLORS.BORDER }}
-    whileHover={{ y: -4 }}
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
   >
-    <div className="flex items-start justify-between">
-      <div>
-        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm font-medium">
-          {label}
-        </p>
-        <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-bold mt-2">
-          {value}
-        </p>
-        {change && (
-          <p className="text-xs mt-2" style={{ color: TEACHER_COLORS.SUCCESS }}>
-            {change}
-          </p>
-        )}
+    <div className="flex justify-between items-start mb-4">
+      <div className="p-3 rounded-xl" style={{ backgroundColor: `${color}15`, color }}>
+        <Icon size={24} />
       </div>
-      <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}20` }}>
-        <Icon size={24} style={{ color }} />
-      </div>
+      {trend && (
+        <span className="flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+          <TrendingUp size={12} className="mr-1" /> {trend}
+        </span>
+      )}
     </div>
+    <h3 className="text-slate-500 text-sm font-medium mb-1">{title}</h3>
+    <p className="text-2xl font-bold text-slate-900">{value}</p>
   </motion.div>
 );
 
-const TeacherAnalytics = () => {
-  // Mock data
-  const assignmentCompletionData = [
-    { name: 'Mon', completed: 24, submitted: 18 },
-    { name: 'Tue', completed: 28, submitted: 22 },
-    { name: 'Wed', completed: 32, submitted: 26 },
-    { name: 'Thu', completed: 30, submitted: 25 },
-    { name: 'Fri', completed: 35, submitted: 32 },
-    { name: 'Sat', completed: 28, submitted: 24 },
-    { name: 'Sun', completed: 20, submitted: 18 },
+const AnalyticsPage = () => {
+  const [courses, setCourses] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [performanceData, setPerformanceData] = useState(null);
+  const [riskData, setRiskData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [coursesRes, riskRes] = await Promise.all([
+          contentApi.getCourses(),
+          performanceApi.getRiskReport()
+        ]);
+        setCourses(coursesRes.data.data);
+        setRiskData(riskRes.data);
+        if (coursesRes.data.data.length > 0) {
+          setSelectedCourseId(coursesRes.data.data[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch initial analytics data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCourseId) return;
+    const fetchCourseStats = async () => {
+      try {
+        const res = await performanceApi.getCoursePerformance(selectedCourseId);
+        setPerformanceData(res.data);
+      } catch (error) {
+        console.error("Failed to fetch course performance:", error);
+      }
+    };
+    fetchCourseStats();
+  }, [selectedCourseId]);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  // Sample data for charts (real data would be mapped from performanceData)
+  const distributionData = [
+    { name: 'Excellent (85+)', value: 12 },
+    { name: 'Good (70-85)', value: 18 },
+    { name: 'Average (50-70)', value: 15 },
+    { name: 'Poor (<50)', value: 5 },
   ];
 
-  const attendanceTrendData = [
-    { name: 'Week 1', attendance: 92 },
-    { name: 'Week 2', attendance: 89 },
-    { name: 'Week 3', attendance: 95 },
-    { name: 'Week 4', attendance: 88 },
-    { name: 'Week 5', attendance: 93 },
-    { name: 'Week 6', attendance: 91 },
-  ];
-
-  const performanceDistribution = [
-    { name: 'A (90-100)', value: 8, color: TEACHER_COLORS.SUCCESS },
-    { name: 'B (80-89)', value: 14, color: TEACHER_COLORS.PRIMARY_BLUE },
-    { name: 'C (70-79)', value: 7, color: TEACHER_COLORS.WARNING },
-    { name: 'D (60-69)', value: 2, color: TEACHER_COLORS.DANGER },
-    { name: 'F (<60)', value: 1, color: TEACHER_COLORS.TEXT_SECONDARY },
-  ];
-
-  const engagementData = [
-    { name: 'Discussion Posts', value: 245 },
-    { name: 'Assignments', value: 189 },
-    { name: 'Quiz Attempts', value: 156 },
-    { name: 'Live Class', value: 128 },
-    { name: 'Material Views', value: 467 },
+  const trendData = [
+    { name: 'Week 1', avg: 65 },
+    { name: 'Week 2', avg: 68 },
+    { name: 'Week 3', avg: 72 },
+    { name: 'Week 4', avg: 70 },
+    { name: 'Week 5', avg: 75 },
+    { name: 'Week 6', avg: 78 },
   ];
 
   return (
-    <motion.div className="p-8">
-      {/* Header */}
-      <motion.div
-        className="mb-8"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-bold">
-          Analytics
-        </h1>
-        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2">
-          Comprehensive insights into your classroom
-        </p>
-      </motion.div>
+    <div className="p-8 max-w-7xl mx-auto">
+      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Performance Analytics</h1>
+          <p className="text-slate-500">Real-time academic intelligence and student gap analysis.</p>
+        </div>
 
-      {/* Stats Cards */}
+        <div className="flex items-center gap-3">
+          <Filter size={20} className="text-slate-400" />
+          <select
+            value={selectedCourseId}
+            onChange={(e) => setSelectedCourseId(e.target.value)}
+            className="px-4 py-2 rounded-xl border bg-white focus:ring-2 focus:ring-blue-500/20 outline-none font-medium shadow-sm"
+            style={{ borderColor: TEACHER_COLORS.BORDER }}
+          >
+            {courses.map(course => (
+              <option key={course.id} value={course.id}>{course.name}</option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          icon={Users}
-          label="Active Students"
-          value="127"
-          change="+8 this week"
-          color={TEACHER_COLORS.PRIMARY_BLUE}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Average Score"
-          value="82%"
-          change="+5% trend"
-          color={TEACHER_COLORS.SUCCESS}
-        />
-        <StatCard
-          icon={Award}
-          label="Completion Rate"
-          value="94%"
-          change="+3% this week"
-          color={TEACHER_COLORS.ACCENT_TEAL}
-        />
-        <StatCard
-          icon={Calendar}
-          label="Avg Attendance"
-          value="91%"
-          change="-2% this week"
-          color={TEACHER_COLORS.SECONDARY_INDIGO}
-        />
+        <StatCard title="Class Average" value="76.4%" icon={Award} trend="+2.4%" color="#3B82F6" />
+        <StatCard title="Submission Rate" value="92%" icon={Target} trend="+5%" color="#10B981" />
+        <StatCard title="Active Students" value="48" icon={Users} color="#8B5CF6" />
+        <StatCard title="At-Risk Students" value={riskData.length} icon={AlertTriangle} color="#EF4444" />
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Assignment Completion Chart */}
-        <motion.div
-          className="bg-white p-6 rounded-xl border"
-          style={{ borderColor: TEACHER_COLORS.BORDER }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-4">
-            Assignment Completion
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={assignmentCompletionData}>
-              <CartesianGrid stroke={TEACHER_COLORS.BORDER} />
-              <XAxis stroke={TEACHER_COLORS.TEXT_SECONDARY} />
-              <YAxis stroke={TEACHER_COLORS.TEXT_SECONDARY} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: TEACHER_COLORS.CARD,
-                  border: `1px solid ${TEACHER_COLORS.BORDER}`,
-                }}
-              />
-              <Legend />
-              <Bar dataKey="completed" fill={TEACHER_COLORS.PRIMARY_BLUE} radius={[8, 8, 0, 0]} />
-              <Bar dataKey="submitted" fill={TEACHER_COLORS.SUCCESS} radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </motion.div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Progress Chart */}
+        <div className="lg:col-span-8 bg-white p-8 rounded-3xl border shadow-sm" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-bold">Class Performance Trend</h3>
+            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Weekly Average Score</span>
+          </div>
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 12}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Area type="monotone" dataKey="avg" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-        {/* Attendance Trend Chart */}
-        <motion.div
-          className="bg-white p-6 rounded-xl border"
-          style={{ borderColor: TEACHER_COLORS.BORDER }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-4">
-            Attendance Trend
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={attendanceTrendData}>
-              <defs>
-                <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={TEACHER_COLORS.SUCCESS} stopOpacity={0.8} />
-                  <stop offset="95%" stopColor={TEACHER_COLORS.SUCCESS} stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke={TEACHER_COLORS.BORDER} />
-              <XAxis stroke={TEACHER_COLORS.TEXT_SECONDARY} />
-              <YAxis stroke={TEACHER_COLORS.TEXT_SECONDARY} domain={[0, 100]} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: TEACHER_COLORS.CARD,
-                  border: `1px solid ${TEACHER_COLORS.BORDER}`,
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="attendance"
-                stroke={TEACHER_COLORS.SUCCESS}
-                fillOpacity={1}
-                fill="url(#colorAttendance)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </motion.div>
-      </div>
-
-      {/* Performance and Engagement */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Performance Distribution */}
-        <motion.div
-          className="bg-white p-6 rounded-xl border"
-          style={{ borderColor: TEACHER_COLORS.BORDER }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-4">
-            Grade Distribution
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={performanceDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name}: ${value}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {performanceDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: TEACHER_COLORS.CARD,
-                  border: `1px solid ${TEACHER_COLORS.BORDER}`,
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Engagement Metrics */}
-        <motion.div
-          className="bg-white p-6 rounded-xl border"
-          style={{ borderColor: TEACHER_COLORS.BORDER }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-4">
-            Student Engagement
-          </h3>
-          <div className="space-y-4">
-            {engagementData.map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + index * 0.05 }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm font-medium">
-                    {item.name}
-                  </span>
-                  <span style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold">
-                    {item.value}
-                  </span>
-                </div>
-                <div
-                  className="h-2 rounded-full overflow-hidden"
-                  style={{ backgroundColor: TEACHER_COLORS.BACKGROUND }}
+        {/* Distribution Chart */}
+        <div className="lg:col-span-4 bg-white p-8 rounded-3xl border shadow-sm" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+          <h3 className="text-lg font-bold mb-8">Grade Distribution</h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={distributionData}
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
                 >
-                  <motion.div
-                    className="h-full"
-                    style={{
-                      backgroundColor: TEACHER_COLORS.PRIMARY_BLUE,
-                    }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(item.value / 467) * 100}%` }}
-                    transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
-                  />
+                  {distributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-3 mt-4">
+            {distributionData.map((item, index) => (
+              <div key={item.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <span className="text-xs text-slate-500 font-medium">{item.name}</span>
                 </div>
-              </motion.div>
+                <span className="text-xs font-bold text-slate-900">{item.value} students</span>
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
+
+        {/* Risk Alerts Table */}
+        <div className="lg:col-span-12 bg-white rounded-3xl border shadow-sm overflow-hidden" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+          <div className="p-8 border-b" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <AlertTriangle className="text-red-500" size={20} />
+              Gap Analysis & High Risk Alerts
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                <tr>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Student Name</th>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Risk Level</th>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Attendance</th>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Avg Score</th>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Weak Topics</th>
+                  <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                {riskData.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-8 py-12 text-center text-slate-400 italic">No high-risk students identified.</td>
+                  </tr>
+                ) : (
+                  riskData.map((student) => (
+                    <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center font-bold text-blue-600 text-xs">
+                            {student.student_name.charAt(0)}
+                          </div>
+                          <span className="font-bold text-slate-900">{student.student_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                          student.risk_level === 'high' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                        }`}>
+                          {student.risk_level}
+                        </span>
+                      </td>
+                      <td className="px-8 py-4 font-medium text-slate-700">{student.attendance_percentage}%</td>
+                      <td className="px-8 py-4 font-medium text-slate-700">{student.overall_score}%</td>
+                      <td className="px-8 py-4 text-xs text-slate-500 max-w-xs truncate">{student.weak_topics}</td>
+                      <td className="px-8 py-4">
+                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1">
+                          Details <ArrowUpRight size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
-export default TeacherAnalytics;
+export default AnalyticsPage;

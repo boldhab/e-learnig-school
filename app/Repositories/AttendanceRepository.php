@@ -12,12 +12,13 @@ class AttendanceRepository {
         $this->db = Database::getInstance();
     }
 
-    public function recordAttendance(array $data): int {
+    public function upsertAttendance(array $data): bool {
         $sql = "INSERT INTO attendance_records (student_id, course_id, teacher_id, attendance_date, status, remarks) 
-                VALUES (:student_id, :course_id, :teacher_id, :attendance_date, :status, :remarks)";
+                VALUES (:student_id, :course_id, :teacher_id, :attendance_date, :status, :remarks)
+                ON DUPLICATE KEY UPDATE status = VALUES(status), remarks = VALUES(remarks)";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
+        return $stmt->execute([
             'student_id' => $data['student_id'],
             'course_id' => $data['course_id'],
             'teacher_id' => $data['teacher_id'],
@@ -25,8 +26,6 @@ class AttendanceRepository {
             'status' => $data['status'],
             'remarks' => $data['remarks'] ?? null
         ]);
-        
-        return $this->db->lastInsertId();
     }
 
     public function checkDuplicate(int $studentId, int $courseId, string $date): bool {

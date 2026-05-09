@@ -5,70 +5,64 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\AttendanceService;
+use App\Services\UserService;
 use App\Helpers\HtmlSanitizer;
 use Exception;
 
 class AttendanceController extends BaseController {
     protected $attendanceService;
+    protected $userService;
 
     public function __construct() {
         $this->attendanceService = new AttendanceService();
+        $this->userService = new UserService();
     }
 
-    public function mark(Request $request, Response $response) {
-        $this->requireRole('TEACHER');
+    public function bulkMark(Request $request, Response $response) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
         
         $data = HtmlSanitizer::sanitize($request->getBody());
         $data['teacher_id'] = $GLOBALS['auth_user']['id'];
-        
-        try {
-            $result = $this->attendanceService->markAttendance($data);
-            $this->success($result, 'Attendance marked successfully', 201);
-        } catch (Exception $e) {
-            $this->error($e->getMessage(), 400);
-        }
-    }
 
-    public function getByStudent(Request $request, Response $response, $id) {
-        $this->requireRole(['STUDENT', 'TEACHER', 'ADMIN']);
-        
-        // Basic check: Student can only view their own attendance
-        $currentUser = $GLOBALS['auth_user'];
-        if ($currentUser['role_id'] == 3 && $currentUser['id'] != $id) {
-            $this->error('Forbidden: You can only view your own attendance', 403);
-        }
-
-        $params = $request->getBody();
-        $courseId = $params['course_id'] ?? null;
-        
-        try {
-            $records = $this->attendanceService->getStudentAttendance($id, $courseId);
-            $this->success($records, 'Student attendance records retrieved');
-        } catch (Exception $e) {
-            $this->error($e->getMessage(), 400);
-        }
-    }
-
-    public function getByCourse(Request $request, Response $response, $id) {
-        $this->requireRole(['TEACHER', 'ADMIN']);
-        
-        $params = $request->getBody();
-        if (empty($params['date'])) {
-            $this->error('Date is required to view course attendance', 400);
+        if (empty($data['course_id']) || empty($data['attendance_date']) || empty($data['records'])) {
+            return $this->error('Missing required fields for bulk attendance', 422);
         }
 
         try {
-            $records = $this->attendanceService->getCourseAttendance($id, $params['date']);
-            $this->success($records, 'Course attendance records retrieved');
+            $this->attendanceService->bulkMarkAttendance($data);
+            $this->success([], 'Attendance marked successfully');
         } catch (Exception $e) {
-            $this->error($e->getMessage(), 400);
+            $this->error($e->getMessage());
         }
     }
 
-    public function getMonthlyReport(Request $request, Response $response) {
-        $this->requireRole(['TEACHER', 'ADMIN']);
-        // Monthly report aggregation logic would go here.
-        // For simplicity, returning a success message as a placeholder.
-        $this->success([], 'Monthly report generation successful');
+    public function getCourseAttendance(Request $request, Response $response) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
+        $courseId = $request->getBody()['course_id'] ?? null;
+        $date = $request->getBody()['date'] ?? date('Y-m-d');
+
+        if (!$courseId) return $this->error('Course ID required', 400);
+
+        try {
+            $attendance = $this->attendanceService->getCourseAttendance($courseId, $date);
+            $this->success($attendance);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getStudentAttendance(Request $request, Response $response) {
+        $this->requireAuth();
+        $user = $GLOBALS['auth_user'];
+        $studentId = ($user['role_name'] === 'STUDENT') ? $user['id'] : ($request->getBody()['student_id'] ?? null);
+
+        if (!$studentId) return $this->error('Student ID required', 400);
+
+        try {
+            $attendance = $this->attendanceService->getStudentAttendance($studentId);
+            $this->success($attendance);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 }

@@ -12,22 +12,17 @@ class CourseService {
         $this->courseRepo = new CourseRepository();
     }
 
-    public function getUserCourses($userId, $role, $classId = null) {
-        if ($role === 'ADMIN') {
-            return $this->courseRepo->getAllCourses();
-        }
-
-        if ($role === 'TEACHER') {
-            return $this->courseRepo->getCoursesByTeacher($userId);
-        }
-
+    public function getUserCourses($userId, $role) {
+        if ($role === 'ADMIN') return $this->courseRepo->getAll();
+        if ($role === 'TEACHER') return $this->courseRepo->getCoursesByTeacher($userId);
         if ($role === 'STUDENT') {
-            if (!$classId) {
-                return [];
-            }
-            return $this->courseRepo->getCoursesByStudent($classId);
+            $user = (new \App\Repositories\UserRepository())->findById($userId);
+            return $this->courseRepo->getCoursesByStudent($user['class_id']);
         }
-
         return [];
+    }
+
+    public function getCourseStudents(int $courseId): array {
+        return $this->courseRepo->getStudentsByCourse($courseId);
     }
 }
