@@ -1,5 +1,9 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Search, ChevronDown } from 'lucide-react';
 import NotificationBell from '../common/NotificationBell';
 import { useAuth } from '../../contexts/AuthContext';
+import { COLORS, SHADOWS } from '../../constants/theme';
 
 const Header = () => {
   const { user } = useAuth();

@@ -1,15 +1,27 @@
 <?php
 
-namespace App\Core;
+namespace App\Engine;
 
 class Request {
     public function getPath() {
         $path = $_SERVER['REQUEST_URI'] ?? '/';
+        
+        // Remove query string
         $position = strpos($path, '?');
-        if ($position === false) {
-            return $path;
+        if ($position !== false) {
+            $path = substr($path, 0, $position);
         }
-        return substr($path, 0, $position);
+
+        // Handle XAMPP subdirectory and front controller
+        $prefixes = ['/millinium/public/main.php', '/millinium/public', '/millinium'];
+        foreach ($prefixes as $prefix) {
+            if (strpos($path, $prefix) === 0) {
+                $path = substr($path, strlen($prefix));
+                break;
+            }
+        }
+
+        return ($path !== '' && $path !== false) ? $path : '/';
     }
 
     public function getMethod() {

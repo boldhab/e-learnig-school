@@ -58,5 +58,15 @@ class PerformanceController extends BaseController {
         } catch (Exception $e) {
             $this->error($e->getMessage(), 400);
         }
+    public function getStudentDashboardStats(Request $request, Response $response) {
+        $this->requireRole('STUDENT');
+        $studentId = $GLOBALS['auth_user']['id'];
+        
+        try {
+            $stats = $this->performanceService->getStudentDashboardSummary($studentId);
+            $this->success($stats);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 }

@@ -85,4 +85,47 @@ class PerformanceService {
     public function getCoursePerformance(int $courseId): array {
         return $this->performanceRepository->getCoursePerformance($courseId);
     }
+
+    public function getStudentDashboardSummary(int $studentId): array {
+        $db = \App\Core\Database::getInstance();
+        $stats = [];
+        
+        // 1. Average Grade (GPA equivalent)
+        $performance = $this->getStudentPerformance($studentId);
+        $totalScore = 0;
+        foreach ($performance as $p) {
+            $totalScore += $p['overall_score'];
+        }
+        $stats['avg_grade'] = count($performance) > 0 ? round($totalScore / count($performance), 1) : 0;
+        
+        // 2. Attendance Rate
+        $attendanceSql = "SELECT 
+                            COUNT(*) as total,
+                            SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as attended
+                          FROM attendance_records WHERE student_id = :sid";
+        $stmt = $db->prepare($attendanceSql);
+        $stmt->execute(['sid' => $studentId]);
+        $att = $stmt->fetch();
+        $stats['attendance_rate'] = ($att && $att['total'] > 0) ? round(($att['attended'] / $att['total']) * 100, 1) : 0;
+        
+        // 3. Active Courses
+        $courseSql = "SELECT COUNT(*) FROM teacher_assignments ta 
+                      JOIN users u ON ta.class_id = u.class_id 
+                      WHERE u.id = :sid";
+        $stmt = $db->prepare($courseSql);
+        $stmt->execute(['sid' => $studentId]);
+        $stats['active_courses'] = (int)$stmt->fetchColumn();
+
+        // 4. Pending Assignments
+        $assignSql = "SELECT COUNT(*) FROM assignments a
+                      JOIN teacher_assignments ta ON a.course_id = ta.course_id
+                      JOIN users u ON ta.class_id = u.class_id
+                      LEFT JOIN assignment_submissions s ON a.id = s.assignment_id AND s.student_id = u.id
+                      WHERE u.id = :sid AND s.id IS NULL";
+        $stmt = $db->prepare($assignSql);
+        $stmt->execute(['sid' => $studentId]);
+        $stats['pending_assignments'] = (int)$stmt->fetchColumn();
+
+        return $stats;
+    }
 }

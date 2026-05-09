@@ -38,4 +38,17 @@ class AdminService {
     public function removeTeacherAssignment($assignmentId) {
         return $this->teacherAssignmentRepo->removeAssignment($assignmentId);
     }
+
+    public function getSchoolStats() {
+        $db = \App\Core\Database::getInstance();
+        
+        $stats = [];
+        $stats['total_users'] = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        $stats['total_students'] = $db->query("SELECT COUNT(*) FROM users u JOIN roles r ON u.role_id = r.id WHERE r.role_name = 'STUDENT'")->fetchColumn();
+        $stats['total_teachers'] = $db->query("SELECT COUNT(*) FROM users u JOIN roles r ON u.role_id = r.id WHERE r.role_name = 'TEACHER'")->fetchColumn();
+        $stats['total_courses'] = $db->query("SELECT COUNT(*) FROM categories WHERE type = 'Subject'")->fetchColumn();
+        $stats['active_discussions'] = $db->query("SELECT COUNT(*) FROM discussion_groups")->fetchColumn();
+        
+        return $stats;
+    }
 }

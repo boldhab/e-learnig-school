@@ -1,320 +1,194 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, BookOpen, CheckCircle, Award } from 'lucide-react';
+import { TrendingUp, BookOpen, CheckCircle, Award, Loader2, Calendar, FileText } from 'lucide-react';
 import { COLORS } from '../../constants/theme';
+import performanceApi from '../../api/modules/performance.api';
+import contentApi from '../../api/modules/content.api';
+import assignmentApi from '../../api/modules/assignment.api';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Quick Stats Card Component
-const StatCard = ({ icon: Icon, label, value, change, color = COLORS.PRIMARY_BLUE }) => (
+const StatCard = ({ icon: Icon, label, value, color }) => (
   <motion.div
-    className="bg-white p-6 rounded-2xl border transition-all hover:shadow-lg"
+    className="bg-white p-6 rounded-3xl border shadow-sm transition-all hover:shadow-md"
     style={{ borderColor: COLORS.BORDER }}
     whileHover={{ y: -4 }}
-    transition={{ type: 'spring', stiffness: 300 }}
   >
     <div className="flex items-start justify-between mb-4">
-      <div
-        className="p-3 rounded-lg"
-        style={{
-          backgroundColor: `${color}15`,
-        }}
-      >
-        <Icon size={24} style={{ color }} />
+      <div className="p-3 rounded-2xl" style={{ backgroundColor: `${color}15`, color }}>
+        <Icon size={24} />
       </div>
-      {change && (
-        <span
-          className="text-sm font-semibold px-2 py-1 rounded-full"
-          style={{
-            backgroundColor: `${COLORS.EMERALD_GREEN}15`,
-            color: COLORS.EMERALD_GREEN,
-          }}
-        >
-          +{change}%
-        </span>
-      )}
     </div>
-    <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm font-medium mb-1">
+    <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs font-bold uppercase tracking-wider mb-1">
       {label}
     </p>
-    <p
-      style={{ color: COLORS.TEXT_PRIMARY }}
-      className="text-2xl font-bold"
-    >
+    <p style={{ color: COLORS.TEXT_PRIMARY }} className="text-3xl font-bold">
       {value}
     </p>
   </motion.div>
 );
 
-// Hero Section Component
-const HeroSection = () => (
-  <motion.div
-    className="relative mb-8 p-8 rounded-2xl overflow-hidden"
-    style={{
-      background: `linear-gradient(135deg, ${COLORS.PRIMARY_BLUE}, ${COLORS.INDIGO})`,
-      color: '#FFFFFF',
-    }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.1 }}
-  >
-    <div className="relative z-10">
-      <h1 className="text-4xl font-bold mb-2">Ready to continue your learning today?</h1>
-      <p className="text-blue-100 text-lg">You have 3 pending assignments and 2 new discussions</p>
-    </div>
-    <div className="absolute top-0 right-0 opacity-10 text-white">
-      <BookOpen size={300} />
-    </div>
-  </motion.div>
-);
-
-// Today's Classes Component
-const TodaysClasses = () => (
-  <motion.div
-    className="bg-white p-6 rounded-2xl border mb-8"
-    style={{ borderColor: COLORS.BORDER }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.3 }}
-  >
-    <h2 className="text-xl font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
-      Today's Classes
-    </h2>
-    <div className="space-y-3">
-      {[
-        { time: '10:00 AM', course: 'Web Development', teacher: 'Mr. Smith', room: 'Room 101' },
-        { time: '01:00 PM', course: 'Data Structures', teacher: 'Dr. Johnson', room: 'Online' },
-        { time: '03:30 PM', course: 'Database Design', teacher: 'Prof. Williams', room: 'Lab 5' },
-      ].map((cls, idx) => (
-        <motion.div
-          key={idx}
-          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-          whileHover={{ x: 4 }}
-        >
-          <div>
-            <p className="font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
-              {cls.course}
-            </p>
-            <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm">
-              {cls.teacher} • {cls.room}
-            </p>
-          </div>
-          <span className="font-semibold" style={{ color: COLORS.PRIMARY_BLUE }}>
-            {cls.time}
-          </span>
-        </motion.div>
-      ))}
-    </div>
-  </motion.div>
-);
-
-// Upcoming Assignments Component
-const UpcomingAssignments = () => (
-  <motion.div
-    className="bg-white p-6 rounded-2xl border mb-8"
-    style={{ borderColor: COLORS.BORDER }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.4 }}
-  >
-    <h2 className="text-xl font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
-      Upcoming Assignments
-    </h2>
-    <div className="space-y-3">
-      {[
-        { title: 'React Project', due: 'May 12, 2026', subject: 'Web Development', status: 'pending' },
-        { title: 'Database Design Doc', due: 'May 15, 2026', subject: 'Database Design', status: 'pending' },
-        { title: 'Algorithm Analysis', due: 'May 18, 2026', subject: 'Data Structures', status: 'submitted' },
-      ].map((assignment, idx) => (
-        <motion.div
-          key={idx}
-          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-          whileHover={{ x: 4 }}
-        >
-          <div className="flex-1">
-            <p className="font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
-              {assignment.title}
-            </p>
-            <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm">
-              {assignment.subject}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm">
-              {assignment.due}
-            </span>
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold"
-              style={{
-                backgroundColor:
-                  assignment.status === 'pending'
-                    ? `${COLORS.WARNING}15`
-                    : `${COLORS.EMERALD_GREEN}15`,
-                color:
-                  assignment.status === 'pending'
-                    ? COLORS.WARNING
-                    : COLORS.EMERALD_GREEN,
-              }}
-            >
-              {assignment.status === 'pending' ? 'Pending' : 'Submitted'}
-            </span>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  </motion.div>
-);
-
-// Recent Materials Component
-const RecentMaterials = () => (
-  <motion.div
-    className="bg-white p-6 rounded-2xl border mb-8"
-    style={{ borderColor: COLORS.BORDER }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.5 }}
-  >
-    <h2 className="text-xl font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
-      Recent Learning Materials
-    </h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {[
-        { title: 'React Hooks Guide', type: 'PDF', course: 'Web Development', date: '2 days ago' },
-        { title: 'Database Normalization', type: 'Video', course: 'Database Design', date: '3 days ago' },
-        { title: 'Algorithm Complexity', type: 'PDF', course: 'Data Structures', date: '4 days ago' },
-        { title: 'REST API Design', type: 'Article', course: 'Web Development', date: '5 days ago' },
-      ].map((material, idx) => (
-        <motion.div
-          key={idx}
-          className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-          whileHover={{ y: -4 }}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <p className="font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
-              {material.title}
-            </p>
-            <span
-              className="text-xs font-semibold px-2 py-1 rounded"
-              style={{
-                backgroundColor: `${COLORS.PRIMARY_BLUE}15`,
-                color: COLORS.PRIMARY_BLUE,
-              }}
-            >
-              {material.type}
-            </span>
-          </div>
-          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm">
-            {material.course}
-          </p>
-          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs mt-2">
-            {material.date}
-          </p>
-        </motion.div>
-      ))}
-    </div>
-  </motion.div>
-);
-
-// Performance Summary Component
-const PerformanceSummary = () => (
-  <motion.div
-    className="bg-white p-6 rounded-2xl border"
-    style={{ borderColor: COLORS.BORDER }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.6 }}
-  >
-    <h2 className="text-xl font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
-      Performance Summary
-    </h2>
-    <div className="space-y-4">
-      {[
-        { subject: 'Web Development', score: 92, target: 100 },
-        { subject: 'Database Design', score: 88, target: 100 },
-        { subject: 'Data Structures', score: 85, target: 100 },
-      ].map((performance, idx) => (
-        <div key={idx}>
-          <div className="flex justify-between mb-2">
-            <p className="text-sm font-semibold" style={{ color: COLORS.TEXT_PRIMARY }}>
-              {performance.subject}
-            </p>
-            <p className="text-sm font-semibold" style={{ color: COLORS.PRIMARY_BLUE }}>
-              {performance.score}/{performance.target}
-            </p>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <motion.div
-              className="h-2 rounded-full"
-              style={{ backgroundColor: COLORS.PRIMARY_BLUE }}
-              initial={{ width: 0 }}
-              animate={{ width: `${(performance.score / performance.target) * 100}%` }}
-              transition={{ duration: 0.8, delay: idx * 0.1 }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  </motion.div>
-);
-
-// Main Dashboard Component
 const Dashboard = () => {
-  return (
-    <div className="p-6 pb-12">
-      {/* Hero Section */}
-      <HeroSection />
+  const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-      {/* Quick Stats */}
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [statsRes, coursesRes, assignmentsRes] = await Promise.all([
+          performanceApi.getStudentStats(),
+          contentApi.getCourses(),
+          assignmentApi.getStudentAssignments()
+        ]);
+        setStats(statsRes.data.data);
+        setCourses(coursesRes.data.data);
+        setAssignments(assignmentsRes.data.data.slice(0, 3)); // Only top 3
+      } catch (error) {
+        console.error("Dashboard fetch failed:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 pb-12 max-w-7xl mx-auto">
+      {/* Hero */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ staggerChildren: 0.1 }}
+        className="relative mb-10 p-10 rounded-[2rem] overflow-hidden shadow-2xl"
+        style={{
+          background: `linear-gradient(135deg, ${COLORS.PRIMARY_BLUE}, ${COLORS.INDIGO})`,
+          color: '#FFFFFF',
+        }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
       >
-        <StatCard
-          icon={BookOpen}
-          label="Active Courses"
-          value="5"
-          change={20}
-          color={COLORS.PRIMARY_BLUE}
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Pending Assignments"
-          value="3"
-          change={-10}
-          color={COLORS.WARNING}
-        />
-        <StatCard
-          icon={Award}
-          label="Attendance Rate"
-          value="92%"
-          change={5}
-          color={COLORS.EMERALD_GREEN}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Average Grade"
-          value="3.8 GPA"
-          change={8}
-          color={COLORS.INDIGO}
-        />
+        <div className="relative z-10 max-w-2xl">
+          <h1 className="text-4xl font-black mb-4 leading-tight">
+            Welcome back, {user?.full_name?.split(' ')[0]}!
+          </h1>
+          <p className="text-blue-100 text-lg font-medium opacity-90">
+            You have {stats?.pending_assignments || 0} pending assignments. Your current attendance rate is {stats?.attendance_rate || 0}%.
+          </p>
+        </div>
+        <div className="absolute -right-20 -top-20 opacity-10 text-white pointer-events-none">
+          <BookOpen size={400} />
+        </div>
       </motion.div>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2">
-          <TodaysClasses />
-          <UpcomingAssignments />
-        </div>
-
-        {/* Sidebar Content */}
-        <div>
-          <RecentMaterials />
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <StatCard icon={BookOpen} label="Enrolled Courses" value={stats?.active_courses || 0} color={COLORS.PRIMARY_BLUE} />
+        <StatCard icon={CheckCircle} label="To-Do Tasks" value={stats?.pending_assignments || 0} color={COLORS.WARNING} />
+        <StatCard icon={Award} label="Attendance" value={`${stats?.attendance_rate || 0}%`} color={COLORS.EMERALD_GREEN} />
+        <StatCard icon={TrendingUp} label="Avg Performance" value={`${stats?.avg_grade || 0}%`} color={COLORS.INDIGO} />
       </div>
 
-      {/* Performance Summary */}
-      <div className="mt-8">
-        <PerformanceSummary />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* Course Schedule */}
+        <div className="lg:col-span-8 space-y-8">
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">Your Courses</h2>
+              <button className="text-sm font-bold text-blue-600 hover:underline">View All</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {courses.map((course) => (
+                <motion.div
+                  key={course.id}
+                  className="p-5 bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  style={{ borderColor: COLORS.BORDER }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <BookOpen size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900">{course.name}</h3>
+                      <p className="text-xs text-slate-400 font-medium">{course.subject_code || 'Academic Course'}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">Upcoming Deadlines</h2>
+              <button className="text-sm font-bold text-blue-600 hover:underline">Full Schedule</button>
+            </div>
+            <div className="space-y-4">
+              {assignments.length === 0 ? (
+                <div className="p-10 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                  <p className="text-slate-400 font-medium">No upcoming assignments. Great job!</p>
+                </div>
+              ) : (
+                assignments.map((asgn) => (
+                  <div key={asgn.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border shadow-sm" style={{ borderColor: COLORS.BORDER }}>
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900">{asgn.title}</h4>
+                        <p className="text-xs text-slate-500">{asgn.course_name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Due Date</p>
+                      <p className="text-sm font-bold text-slate-700">{new Date(asgn.due_date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Sidebar Info */}
+        <div className="lg:col-span-4 space-y-8">
+          <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
+            <div className="relative z-10">
+              <h3 className="text-xl font-bold mb-4">Daily Motivation</h3>
+              <p className="text-slate-400 text-sm italic mb-6">
+                "The beautiful thing about learning is that no one can take it away from you."
+              </p>
+              <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-widest">
+                <TrendingUp size={14} /> Keep Pushing
+              </div>
+            </div>
+            <div className="absolute -right-4 -bottom-4 opacity-10">
+              <Award size={120} />
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2rem] border shadow-sm" style={{ borderColor: COLORS.BORDER }}>
+            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+              <Calendar size={20} className="text-blue-600" />
+              Calendar
+            </h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                <p className="text-xs font-bold text-blue-600 mb-1">Upcoming Event</p>
+                <p className="text-sm font-bold text-slate-900">Mid-term Examination Week</p>
+                <p className="text-xs text-slate-500 mt-1">Starts in 5 days</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

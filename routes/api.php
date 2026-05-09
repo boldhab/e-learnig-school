@@ -1,6 +1,7 @@
 <?php
 
-use App\Core\Router;
+// No namespace for SystemRouter
+
 use App\Controllers\AuthController;
 use App\Controllers\AdminController;
 use App\Controllers\UserController;
@@ -14,10 +15,17 @@ use App\Controllers\SupportTicketController;
 
 /** @var Router $router */
 
+// Health Check
+$router->get('/api/health', function() {
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'ok', 'modules' => 'loaded']);
+    exit;
+});
+
 // Auth Routes
-$router->post('/api/login', [AuthController::class, 'login']);
-$router->post('/api/logout', [AuthController::class, 'logout']);
-$router->get('/api/me', [AuthController::class, 'me']);
+$router->post('/api/auth/login', [AuthController::class, 'login']);
+$router->post('/api/auth/logout', [AuthController::class, 'logout']);
+$router->get('/api/auth/me', [AuthController::class, 'me']);
 
 // Admin Routes
 $router->post('/api/admin/students', [AdminController::class, 'createStudent']);
@@ -27,6 +35,16 @@ $router->put('/api/admin/users/status', [AdminController::class, 'changeUserStat
 $router->post('/api/admin/assign-student', [AdminController::class, 'assignStudent']);
 $router->post('/api/admin/assign-teacher', [AdminController::class, 'assignTeacher']);
 $router->get('/api/admin/teachers/{id}/assignments', [AdminController::class, 'getTeacherAssignments']);
+
+// Admin Routes
+$router->get('admin/users', 'AdminController@getAllUsers');
+$router->post('admin/students', 'AdminController@createStudent');
+$router->post('admin/teachers', 'AdminController@createTeacher');
+$router->post('admin/users/status', 'AdminController@changeUserStatus');
+$router->post('admin/assign-student', 'AdminController@assignStudent');
+$router->post('admin/assign-teacher', 'AdminController@assignTeacher');
+$router->get('admin/teachers/{id}/assignments', 'AdminController@getTeacherAssignments');
+$router->get('admin/stats', 'AdminController@getStats');
 
 // Category/Course Routes
 $router->post('/api/categories', [\App\Controllers\CategoryController::class, 'create']);
@@ -66,7 +84,8 @@ $router->post('/api/discussions/topics/{id}/messages', [\App\Controllers\Discuss
 $router->delete('/api/discussions/messages/{id}', [\App\Controllers\DiscussionController::class, 'deleteMessage']);
 
 // Performance & Analytics Routes
-$router->get('performance/student', 'PerformanceController@getStudentData');
+$router->get('performance/student/stats', 'PerformanceController@getStudentDashboardStats');
+$router->get('performance/student', 'PerformanceController@getByStudent');
 $router->get('performance/course/{id}', 'PerformanceController@getCourseData');
 $router->get('performance/gap-analysis', 'GapAnalysisController@getStudentAnalysis');
 $router->get('performance/risk-report', 'GapAnalysisController@getRiskReport');

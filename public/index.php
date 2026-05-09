@@ -20,7 +20,7 @@ if (file_exists(__DIR__ . '/../.env')) {
 
 require_once __DIR__ . '/../app/Core/Request.php';
 require_once __DIR__ . '/../app/Core/Response.php';
-require_once __DIR__ . '/../app/Core/Router.php';
+require_once __DIR__ . '/../app/Core/RouterService.php';
 require_once __DIR__ . '/../app/Core/Database.php';
 require_once __DIR__ . '/../app/Helpers/functions.php';
 
@@ -44,7 +44,7 @@ spl_autoload_register(function ($class) {
 
 use App\Core\Request;
 use App\Core\Response;
-use App\Core\Router;
+use App\Core\RouterService as Router;
 
 $request = new Request();
 $response = new Response();

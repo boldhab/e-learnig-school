@@ -124,4 +124,14 @@ class AdminController extends BaseController {
         $assignments = $this->adminService->getTeacherAssignments($id);
         $this->success($assignments);
     }
+
+    public function getStats(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+        try {
+            $stats = $this->adminService->getSchoolStats();
+            $this->success($stats);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
 }

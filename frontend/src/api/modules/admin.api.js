@@ -1,0 +1,25 @@
+import api from "../axios.config";
+
+const adminApi = {
+  // User Management
+  getUsers: () => api.get("admin/users"),
+  createStudent: (data) => api.post("admin/students", data),
+  createTeacher: (data) => api.post("admin/teachers", data),
+  updateUserStatus: (id, status) => api.post("admin/users/status", { id, status }),
+  
+  // Assignments/Classes
+  assignStudent: (data) => api.post("admin/assign-student", data),
+  assignTeacher: (data) => api.post("admin/assign-teacher", data),
+  getTeacherAssignments: (id) => api.get(`admin/teachers/${id}/assignments`),
+
+  // Stats & Overview
+  getDashboardStats: () => api.get("admin/stats"),
+  getActivityLogs: () => api.get("admin/logs"),
+
+  // System
+  backupSystem: () => api.post("admin/backup"),
+  getSettings: () => api.get("admin/settings"),
+  updateSettings: (data) => api.post("admin/settings", data)
+};
+
+export default adminApi;
