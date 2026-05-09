@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { Search, ChevronDown } from 'lucide-react';
 import NotificationBell from '../common/NotificationBell';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { COLORS, SHADOWS } from '../../constants/theme';
 
 const Header = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const getInitials = (name) => {
@@ -85,7 +87,18 @@ const Header = () => {
               <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors">
                 Settings
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors border-t">
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors border-t"
+                onClick={async () => {
+                  setShowProfileMenu(false);
+                  try {
+                    await logout();
+                  } catch (e) {
+                    // ignore errors, still navigate to login
+                  }
+                  navigate('/auth/login');
+                }}
+              >
                 Logout
               </button>
             </motion.div>

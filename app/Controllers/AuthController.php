@@ -47,6 +47,8 @@ class AuthController {
     }
 
     public function me(Request $request, Response $response) {
+        $auth = new \App\Middleware\AuthMiddleware();
+        $auth->handle($request, $response);
         $user = $GLOBALS['auth_user'] ?? null;
         if (!$user) {
             return $this->error('Unauthorized', 401);

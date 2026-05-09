@@ -23,34 +23,33 @@ import {
   Shield,
 } from 'lucide-react';
 import { ADMIN_COLORS } from '../../../constants/adminTheme';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const sections = [
   {
     title: 'Management',
     items: [
-      { icon: Users, label: 'User Management', path: '/admin/users' },
-      { icon: GraduationCap, label: 'Teachers', path: '/admin/teachers' },
-      { icon: BookOpen, label: 'Students', path: '/admin/students' },
-      { icon: BookOpen, label: 'Courses & Subjects', path: '/admin/courses' },
-      { icon: ClipboardList, label: 'Assignments Overview', path: '/admin/assignments' },
+      { icon: Users, label: 'User Management', path: '../admin/users' },
+      { icon: BookOpen, label: 'Courses & Subjects', path: '../admin/courses' },
+      { icon: ClipboardList, label: 'Assignments Overview', path: '../admin/assignments' },
     ],
   },
   {
     title: 'Monitoring',
     items: [
-      { icon: MessageSquare, label: 'Discussions Monitoring', path: '/admin/discussions' },
-      { icon: CalendarDays, label: 'Attendance Reports', path: '/admin/attendance' },
-      { icon: BarChart3, label: 'Performance Analytics', path: '/admin/analytics' },
-      { icon: Bell, label: 'Notifications', path: '/admin/notifications' },
-      { icon: Activity, label: 'Activity Logs', path: '/admin/activity-logs' },
+      { icon: MessageSquare, label: 'Discussions Monitoring', path: '../admin/discussions' },
+      { icon: CalendarDays, label: 'Attendance Reports', path: '../admin/attendance' },
+      { icon: BarChart3, label: 'Performance Analytics', path: '../admin/analytics' },
+      { icon: Bell, label: 'Notifications', path: '../admin/notifications' },
+      { icon: Activity, label: 'Activity Logs', path: '../admin/activity-logs' },
     ],
   },
   {
     title: 'Configuration',
     items: [
-      { icon: Settings, label: 'System Settings', path: '/admin/settings' },
-      { icon: Database, label: 'Backups & Recovery', path: '/admin/backups' },
-      { icon: UserCircle2, label: 'Profile', path: '/admin/profile' },
+      { icon: Settings, label: 'System Settings', path: '../admin/settings' },
+      { icon: Database, label: 'Backups & Recovery', path: '../admin/backups' },
+      { icon: UserCircle2, label: 'Profile', path: '../admin/profile' },
     ],
   },
 ];
@@ -62,9 +61,23 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
 
   const activePath = useMemo(() => location.pathname, [location.pathname]);
 
-  const isActive = (path) => activePath === path;
+  const isActive = (path) => {
+    const lastPart = path.split('/').pop();
+    return location.pathname.endsWith(lastPart);
+  };
 
-  const handleLogout = () => navigate('/auth/login');
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    (async () => {
+      try {
+        await logout();
+      } catch (e) {
+        // ignore
+      }
+      navigate('/auth/login');
+    })();
+  };
 
   const renderContent = () => (
     <>
@@ -83,9 +96,9 @@ const AdminSidebar = ({ isOpen, setIsOpen }) => {
       <nav className="flex-1 space-y-3 overflow-y-auto p-4">
         <button
           type="button"
-          onClick={() => navigate('/admin/dashboard')}
-          className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-colors ${isActive('/admin/dashboard') ? 'text-white' : 'text-slate-300 hover:text-white'}`}
-          style={{ backgroundColor: isActive('/admin/dashboard') ? ADMIN_COLORS.PRIMARY_BLUE : 'transparent' }}
+          onClick={() => navigate('../admin/dashboard')}
+          className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-colors ${isActive('dashboard') || location.pathname.endsWith('dashboard') ? 'text-white' : 'text-slate-300 hover:text-white'}`}
+          style={{ backgroundColor: isActive('dashboard') || location.pathname.endsWith('dashboard') ? ADMIN_COLORS.PRIMARY_BLUE : 'transparent' }}
         >
           <LayoutDashboard size={18} />
           Dashboard

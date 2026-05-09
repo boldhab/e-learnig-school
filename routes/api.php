@@ -36,19 +36,28 @@ $router->post('/api/admin/assign-student', [AdminController::class, 'assignStude
 $router->post('/api/admin/assign-teacher', [AdminController::class, 'assignTeacher']);
 $router->get('/api/admin/teachers/{id}/assignments', [AdminController::class, 'getTeacherAssignments']);
 
-// Admin Routes
-$router->get('admin/users', 'AdminController@getAllUsers');
-$router->post('admin/students', 'AdminController@createStudent');
-$router->post('admin/teachers', 'AdminController@createTeacher');
-$router->post('admin/users/status', 'AdminController@changeUserStatus');
-$router->post('admin/assign-student', 'AdminController@assignStudent');
-$router->post('admin/assign-teacher', 'AdminController@assignTeacher');
-$router->get('admin/teachers/{id}/assignments', 'AdminController@getTeacherAssignments');
-$router->get('admin/stats', 'AdminController@getStats');
+// Admin Routes (Extended)
+$router->get('/api/admin/users', [AdminController::class, 'getAllUsers']);
+$router->post('/api/admin/students', [AdminController::class, 'createStudent']);
+$router->post('/api/admin/teachers', [AdminController::class, 'createTeacher']);
+$router->post('/api/admin/users/status', [AdminController::class, 'changeUserStatus']);
+$router->post('/api/admin/assign-student', [AdminController::class, 'assignStudent']);
+$router->post('/api/admin/assign-teacher', [AdminController::class, 'assignTeacher']);
+$router->get('/api/admin/teachers/{id}/assignments', [AdminController::class, 'getTeacherAssignments']);
+$router->get('/api/admin/stats', [AdminController::class, 'getStats']);
+$router->get('/api/admin/logs', [AdminController::class, 'getLogs']);
+$router->get('/api/admin/classes', [AdminController::class, 'getClasses']);
+$router->get('/api/admin/courses', [AdminController::class, 'getCourses']);
+$router->post('/api/admin/users/update', [AdminController::class, 'updateUser']);
+$router->post('/api/admin/users/delete', [AdminController::class, 'deleteUser']);
+$router->post('/api/admin/users/reset-password', [AdminController::class, 'resetPassword']);
+$router->post('/api/admin/users/status', [AdminController::class, 'changeUserStatus']);
 
 // Category/Course Routes
 $router->post('/api/categories', [\App\Controllers\CategoryController::class, 'create']);
 $router->get('/api/categories', [\App\Controllers\CategoryController::class, 'list']);
+$router->get('/api/courses', [\App\Controllers\CourseController::class, 'list']);
+$router->get('/api/courses/{id}/students', [\App\Controllers\CourseController::class, 'students']);
 
 // Assignment Routes
 $router->post('/api/assignments/create', [\App\Controllers\AssignmentController::class, 'create']);
@@ -66,14 +75,10 @@ $router->get('/api/student/submissions', [\App\Controllers\SubmissionController:
 $router->post('/api/submissions/{id}/grade', [\App\Controllers\GradingController::class, 'grade']);
 $router->post('/api/grades/publish', [\App\Controllers\GradingController::class, 'publish']);
 
-// Course Routes
-$router->get('courses', 'CourseController@list');
-$router->get('courses/{id}/students', 'CourseController@students');
-
 // Material Routes
-$router->get('materials', 'MaterialController@list');
-$router->post('materials/upload', 'MaterialController@upload');
-$router->delete('materials/{id}', 'MaterialController@delete');
+$router->get('/api/materials', [\App\Controllers\MaterialController::class, 'list']);
+$router->post('/api/materials/upload', [\App\Controllers\MaterialController::class, 'upload']);
+$router->delete('/api/materials/{id}', [\App\Controllers\MaterialController::class, 'delete']);
 
 // Discussion Routes
 $router->get('/api/discussions/groups', [\App\Controllers\DiscussionController::class, 'getGroups']);
@@ -84,16 +89,16 @@ $router->post('/api/discussions/topics/{id}/messages', [\App\Controllers\Discuss
 $router->delete('/api/discussions/messages/{id}', [\App\Controllers\DiscussionController::class, 'deleteMessage']);
 
 // Performance & Analytics Routes
-$router->get('performance/student/stats', 'PerformanceController@getStudentDashboardStats');
-$router->get('performance/student', 'PerformanceController@getByStudent');
-$router->get('performance/course/{id}', 'PerformanceController@getCourseData');
-$router->get('performance/gap-analysis', 'GapAnalysisController@getStudentAnalysis');
-$router->get('performance/risk-report', 'GapAnalysisController@getRiskReport');
+$router->get('/api/performance/student/stats', [\App\Controllers\PerformanceController::class, 'getStudentDashboardStats']);
+$router->get('/api/performance/student', [\App\Controllers\PerformanceController::class, 'getByStudent']);
+$router->get('/api/performance/course/{id}', [\App\Controllers\PerformanceController::class, 'getCourseData']);
+$router->get('/api/performance/gap-analysis', [\App\Controllers\GapAnalysisController::class, 'getStudentAnalysis']);
+$router->get('/api/performance/risk-report', [\App\Controllers\GapAnalysisController::class, 'getRiskReport']);
 
 // Attendance Routes
-$router->post('attendance/bulk', 'AttendanceController@bulkMark');
-$router->get('attendance/course', 'AttendanceController@getCourseAttendance');
-$router->get('attendance/student', 'AttendanceController@getStudentAttendance');
+$router->post('/api/attendance/bulk', [\App\Controllers\AttendanceController::class, 'bulkMark']);
+$router->get('/api/attendance/course', [\App\Controllers\AttendanceController::class, 'getCourseAttendance']);
+$router->get('/api/attendance/student', [\App\Controllers\AttendanceController::class, 'getStudentAttendance']);
 $router->post('/api/discussions/topics/{id}/close', [\App\Controllers\DiscussionController::class, 'closeTopic']);
 $router->post('/api/discussions/topics/{id}/open', [\App\Controllers\DiscussionController::class, 'openTopic']);
 $router->get('/api/courses/{id}/discussion', [\App\Controllers\DiscussionController::class, 'getCourseDiscussion']);
@@ -129,6 +134,8 @@ $router->get('/api/gap-analysis/high-risk', [GapAnalysisController::class, 'getH
 // ==========================================
 
 // Notification Routes
+$router->get('/api/notifications/stream', [\App\Controllers\SseController::class, 'stream']);
+$router->post('/api/broadcasting/auth', [\App\Controllers\BroadcastingController::class, 'authenticate']);
 $router->get('/api/notifications', [NotificationController::class, 'getNotifications']);
 $router->get('/api/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
 $router->put('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead']);

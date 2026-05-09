@@ -52,9 +52,15 @@ class UserRepository {
     }
 
     public function getAllUsers() {
-        $sql = "SELECT u.id, u.full_name, u.username, u.email, r.role_name, u.status, u.created_at 
+        $sql = "SELECT u.id, u.full_name, u.username, u.email, r.role_name, u.status, u.created_at, u.class_id,
+                cl.name as class_name,
+                (SELECT GROUP_CONCAT(sub.name SEPARATOR ', ') 
+                 FROM teacher_assignments ta 
+                 JOIN categories sub ON ta.course_id = sub.id 
+                 WHERE ta.teacher_id = u.id) as subjects
                 FROM users u 
-                JOIN roles r ON u.role_id = r.id";
+                JOIN roles r ON u.role_id = r.id
+                LEFT JOIN categories cl ON u.class_id = cl.id";
         return $this->db->query($sql)->fetchAll();
     }
 

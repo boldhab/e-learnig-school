@@ -2,16 +2,25 @@ import api from '../axios.config';
 
 const authApi = {
   login: async (credentials) => {
-    const response = await api.post('/auth/login', credentials);
-    return response.data;
+    // Backend validation expects field named 'login' (accepts email or username)
+    const payload = {
+      login: credentials.email || credentials.login,
+      password: credentials.password,
+    };
+    const response = await api.post('/auth/login', payload);
+    // ApiResponseTrait wraps result as: { status, message, data: { token, user } }
+    // Unwrap and return the inner data directly so callers get { token, user }
+    return response.data?.data ?? response.data;
   },
+
   logout: async () => {
     const response = await api.post('/auth/logout');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
+
   me: async () => {
     const response = await api.get('/auth/me');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 };
 

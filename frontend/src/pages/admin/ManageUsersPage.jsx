@@ -1,38 +1,69 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, MoreHorizontal, ShieldCheck, UserPlus, RefreshCcw, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, ShieldCheck, UserPlus, RefreshCcw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import adminApi from '../../api/modules/admin.api';
 import { ADMIN_COLORS } from '../../constants/adminTheme';
 import { AdminBadge, AdminCard, AdminSection, AdminToolbarButton } from '../../components/admin/AdminUI';
-
-const users = [
-	{ name: 'Amina Yusuf', role: 'Teacher', email: 'amina@millennium.edu', status: 'Active', lastLogin: '2 min ago' },
-	{ name: 'Daniel Okoro', role: 'Student', email: 'daniel@millennium.edu', status: 'Active', lastLogin: '10 min ago' },
-	{ name: 'Grace Mensah', role: 'Teacher', email: 'grace@millennium.edu', status: 'Inactive', lastLogin: '2 days ago' },
-	{ name: 'John Smith', role: 'Student', email: 'john@millennium.edu', status: 'Pending', lastLogin: 'Never' },
-	{ name: 'Victoria James', role: 'Admin', email: 'victoria@millennium.edu', status: 'Active', lastLogin: '1 hr ago' },
-];
-
-const roleTone = {
-	Admin: 'blue',
-	Teacher: 'teal',
-	Student: 'slate',
-};
-
-const statusTone = {
-	Active: 'green',
-	Inactive: 'red',
-	Pending: 'amber',
-};
+import CreateUserModal from '../../components/admin/CreateUserModal';
+import UserDetailsModal from '../../components/admin/UserDetailsModal';
 
 const ManageUsersPage = ({ defaultRole = 'all' }) => {
+	const [users, setUsers] = useState([]);
+	const [loading, setLoading] = useState(true);
 	const [query, setQuery] = useState('');
 	const [roleFilter, setRoleFilter] = useState(defaultRole);
+	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+	const [selectedUser, setSelectedUser] = useState(null);
+	const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-	const filteredUsers = useMemo(() => users.filter((user) => {
-		const matchesQuery = [user.name, user.email, user.role].join(' ').toLowerCase().includes(query.toLowerCase());
-		const matchesRole = roleFilter === 'all' ? true : user.role.toLowerCase() === roleFilter.toLowerCase();
-		return matchesQuery && matchesRole;
-	}), [query, roleFilter]);
+	const fetchUsers = async () => {
+		setLoading(true);
+		try {
+			const res = await adminApi.getUsers();
+			setUsers(res.data?.data || res.data || []);
+		} catch (err) {
+			console.error("Failed to fetch users:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		fetchUsers();
+	}, []);
+
+	const roleTone = {
+		admin: 'blue',
+		teacher: 'teal',
+		student: 'slate',
+	};
+
+	const statusTone = {
+		active: 'green',
+		inactive: 'red',
+		pending: 'amber',
+	};
+
+	const filteredUsers = useMemo(() => {
+		if (!users) return [];
+		return users.filter((user) => {
+			const name = user.full_name || '';
+			const email = user.email || '';
+			const role = (user.role_name || '').toLowerCase();
+			
+			const matchesQuery = [name, email, role].join(' ').toLowerCase().includes(query.toLowerCase());
+			const matchesRole = roleFilter === 'all' ? true : role === roleFilter.toLowerCase();
+			return matchesQuery && matchesRole;
+		});
+	}, [users, query, roleFilter]);
+
+	if (loading) {
+		return (
+			<div className="h-64 flex items-center justify-center">
+				<Loader2 className="animate-spin text-blue-600" size={48} />
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6">
@@ -41,7 +72,11 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 				description="Create users, assign roles, activate accounts, and reset passwords across the system."
 				action={
 					<div className="flex flex-wrap gap-3">
-						<button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-sm">
+						<button 
+							type="button" 
+							onClick={() => setIsCreateModalOpen(true)}
+							className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 transition-colors"
+						>
 							<UserPlus size={16} />
 							Create User
 						</button>
@@ -71,10 +106,10 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 
 				<div className="grid gap-4 md:grid-cols-4">
 					{[
-						{ title: 'Total Users', value: '1,364', trend: '+9.4%', icon: ShieldCheck },
-						{ title: 'Active Accounts', value: '1,287', trend: '+7.8%', icon: CheckCircle2 },
-						{ title: 'Pending Invites', value: '24', trend: '+3', icon: Filter },
-						{ title: 'Inactive Users', value: '53', trend: '-2', icon: XCircle },
+						{ title: 'Total Users', value: users.length, trend: 'Real-time', icon: ShieldCheck },
+						{ title: 'Active Accounts', value: users.filter(u => u.status === 'active').length, trend: 'Live', icon: CheckCircle2 },
+						{ title: 'Teachers', value: users.filter(u => u.role_name === 'TEACHER').length, trend: 'Staff', icon: Filter },
+						{ title: 'Students', value: users.filter(u => u.role_name === 'STUDENT').length, trend: 'Students', icon: XCircle },
 					].map((metric) => (
 						<AdminCard key={metric.title} className="p-5">
 							<div className="flex items-start justify-between gap-3">
@@ -100,24 +135,34 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 									<th className="px-6 py-4 font-semibold">Role</th>
 									<th className="px-6 py-4 font-semibold">Email</th>
 									<th className="px-6 py-4 font-semibold">Status</th>
-									<th className="px-6 py-4 font-semibold">Last Login</th>
+									<th className="px-6 py-4 font-semibold">Joined</th>
 									<th className="px-6 py-4 font-semibold">Actions</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-slate-200 bg-white">
 								{filteredUsers.map((user) => (
-									<motion.tr key={user.email} whileHover={{ backgroundColor: '#F8FAFC' }}>
+									<motion.tr 
+										key={user.id} 
+										whileHover={{ backgroundColor: '#F8FAFC' }}
+										onClick={() => {
+											setSelectedUser(user);
+											setIsDetailsModalOpen(true);
+										}}
+										className="cursor-pointer transition-colors"
+									>
 										<td className="px-6 py-4">
-											<div className="font-medium text-slate-900">{user.name}</div>
+											<div className="font-medium text-slate-900">{user.full_name}</div>
 										</td>
 										<td className="px-6 py-4">
-											<AdminBadge tone={roleTone[user.role] || 'slate'}>{user.role}</AdminBadge>
+											<AdminBadge tone={roleTone[(user.role_name || '').toLowerCase()] || 'slate'}>{user.role_name}</AdminBadge>
 										</td>
 										<td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
 										<td className="px-6 py-4">
-											<AdminBadge tone={statusTone[user.status] || 'slate'}>{user.status}</AdminBadge>
+											<AdminBadge tone={statusTone[(user.status || '').toLowerCase()] || 'slate'}>{user.status}</AdminBadge>
 										</td>
-										<td className="px-6 py-4 text-sm text-slate-600">{user.lastLogin}</td>
+										<td className="px-6 py-4 text-sm text-slate-600">
+											{new Date(user.created_at).toLocaleDateString()}
+										</td>
 										<td className="px-6 py-4">
 											<button type="button" className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
 												<MoreHorizontal size={18} />
@@ -138,6 +183,22 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 					</div>
 				</AdminCard>
 			</AdminSection>
+
+			<CreateUserModal 
+				isOpen={isCreateModalOpen} 
+				onClose={() => setIsCreateModalOpen(false)} 
+				onUserCreated={fetchUsers}
+			/>
+
+			<UserDetailsModal
+				user={selectedUser}
+				isOpen={isDetailsModalOpen}
+				onClose={() => {
+					setIsDetailsModalOpen(false);
+					setSelectedUser(null);
+				}}
+				onActionComplete={fetchUsers}
+			/>
 		</div>
 	);
 };

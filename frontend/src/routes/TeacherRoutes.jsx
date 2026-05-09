@@ -9,16 +9,19 @@ import TeacherAnalytics from '../pages/teacher/Analytics';
 
 const TeacherRoutes = () => {
   return (
-    <Routes>
-      <Route element={<TeacherMainLayout><TeacherDashboard /></TeacherMainLayout>} path="/teacher/dashboard" />
-      <Route element={<TeacherMainLayout><TeacherCourses /></TeacherMainLayout>} path="/teacher/courses" />
-      <Route element={<TeacherMainLayout><TeacherMaterials /></TeacherMainLayout>} path="/teacher/materials" />
-      <Route element={<TeacherMainLayout><TeacherAssignments /></TeacherMainLayout>} path="/teacher/assignments" />
-      <Route element={<TeacherMainLayout><TeacherGrading /></TeacherMainLayout>} path="/teacher/grading" />
-      <Route element={<TeacherMainLayout><TeacherAnalytics /></TeacherMainLayout>} path="/teacher/analytics" />
-      {/* Submission, Discussions, Live Classes, Attendance, Notifications, Profile - Coming Soon */}
-      <Route path="/teacher/*" element={<Navigate to="/teacher/dashboard" replace />} />
-    </Routes>
+    <TeacherMainLayout>
+      <Routes>
+        {/* Relative paths — mounted under /teacher/* in App.jsx */}
+        <Route path="dashboard"    element={<TeacherDashboard />} />
+        <Route path="courses"      element={<TeacherCourses />} />
+        <Route path="materials"    element={<TeacherMaterials />} />
+        <Route path="assignments"  element={<TeacherAssignments />} />
+        <Route path="grading"      element={<TeacherGrading />} />
+        <Route path="analytics"    element={<TeacherAnalytics />} />
+        {/* Catch-all → default teacher page */}
+        <Route path="*" element={<Navigate to="dashboard" replace />} />
+      </Routes>
+    </TeacherMainLayout>
   );
 };
 

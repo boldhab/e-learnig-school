@@ -42,20 +42,25 @@ const StatCard = ({ title, value, icon: Icon, trend, color }) => (
 
 const AdminDashboardPage = () => {
   const [stats, setStats] = useState(null);
+  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const res = await adminApi.getDashboardStats();
-        setStats(res.data.data);
+        const [statsRes, logsRes] = await Promise.all([
+          adminApi.getDashboardStats(),
+          adminApi.getActivityLogs()
+        ]);
+        setStats(statsRes.data?.data || statsRes.data);
+        setLogs(logsRes.data?.data || logsRes.data || []);
       } catch (error) {
-        console.error("Failed to fetch admin stats:", error);
+        console.error("Failed to fetch admin data:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -133,27 +138,34 @@ const AdminDashboardPage = () => {
             <button className="text-sm text-blue-600 font-bold hover:underline">View All Logs</button>
           </div>
           <div className="space-y-6">
-            {[
-              { type: 'USER', msg: 'New teacher account created: Sarah Connor', time: '10 mins ago', icon: Users, color: 'blue' },
-              { type: 'COURSE', msg: 'New course material uploaded in Physics 101', time: '45 mins ago', icon: BookOpen, color: 'emerald' },
-              { type: 'SECURITY', msg: 'Database backup successfully completed', time: '2 hours ago', icon: ShieldCheck, color: 'purple' },
-              { type: 'SYSTEM', msg: 'Pusher real-time connection stable', time: '3 hours ago', icon: Activity, color: 'slate' },
-            ].map((log, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-slate-100 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-xl bg-white text-${log.color}-600 shadow-sm`}>
-                    <log.icon size={18} />
+            {logs.length > 0 ? logs.map((log, i) => {
+              const Icon = log.type === 'USER' ? Users : log.type === 'SECURITY' ? ShieldCheck : Activity;
+              const colorClass = log.color || 'slate';
+              
+              return (
+                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-xl bg-white text-${colorClass}-600 shadow-sm`}>
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{log.msg}</p>
+                      <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        {log.type} • {new Date(log.time).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{log.msg}</p>
-                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{log.type} • {log.time}</p>
-                  </div>
+                  <button className="p-2 text-slate-400 hover:text-slate-600">
+                    <AlertCircle size={16} />
+                  </button>
                 </div>
-                <button className="p-2 text-slate-400 hover:text-slate-600">
-                  <AlertCircle size={16} />
-                </button>
+              );
+            }) : (
+              <div className="text-center py-8 text-slate-400">
+                <Activity className="mx-auto mb-2 opacity-20" size={48} />
+                <p>No recent system activity found.</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

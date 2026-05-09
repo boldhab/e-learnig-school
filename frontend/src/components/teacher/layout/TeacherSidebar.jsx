@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../../constants/teacherTheme';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const TeacherSidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
@@ -41,7 +42,15 @@ const TeacherSidebar = ({ isOpen, setIsOpen }) => {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    navigate('/auth/login');
+    // Perform auth logout then navigate to login
+    (async () => {
+      try {
+        await logout();
+      } catch (e) {
+        // ignore
+      }
+      navigate('/auth/login');
+    })();
   };
 
   const renderSidebarContent = () => (

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import Pusher from 'pusher-js';
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import { Bell, Info, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
@@ -14,34 +13,35 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    // Initialize Pusher
-    const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
-      cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-      forceTLS: true,
-      authEndpoint: `${import.meta.env.VITE_API_BASE_URL}/broadcasting/auth`,
-      auth: {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
+    // Use Server-Sent Events (SSE) instead of Pusher
+    const token = localStorage.getItem('token');
+    const sseUrl = `${import.meta.env.VITE_API_BASE_URL}/notifications/stream?token=${token}`;
+    
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.addEventListener('notification.received', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('New SSE notification:', data);
+        
+        // Update local state
+        setNotifications(prev => [data, ...prev]);
+        setUnreadCount(prev => prev + 1);
+
+        // Trigger Toast
+        showToast(data);
+      } catch (err) {
+        console.error('Error parsing SSE data:', err);
       }
     });
 
-    const channel = pusher.subscribe(`private-user-${user.id}`);
-
-    channel.bind('notification.received', (data) => {
-      console.log('New notification:', data);
-      
-      // Update local state
-      setNotifications(prev => [data, ...prev]);
-      setUnreadCount(prev => prev + 1);
-
-      // Trigger Toast
-      showToast(data);
-    });
+    eventSource.onerror = (err) => {
+      console.error('SSE connection error:', err);
+      // EventSource automatically retries, but we can log it
+    };
 
     return () => {
-      pusher.unsubscribe(`private-user-${user.id}`);
-      pusher.disconnect();
+      eventSource.close();
     };
   }, [user]);
 

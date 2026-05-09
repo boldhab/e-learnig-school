@@ -18,6 +18,26 @@ if (file_exists(__DIR__ . '/../.env')) {
     }
 }
 
+// CORS - allow local dev server (Vite) and same-origin requests
+if (isset($_SERVER['HTTP_ORIGIN'])) {
+    // Allow specific origin or echo back the origin for dev convenience
+    $origin = $_SERVER['HTTP_ORIGIN'];
+    // Only allow http(s) origins to be safe
+    if (strpos($origin, 'http://') === 0 || strpos($origin, 'https://') === 0) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With, X-Socket-ID');
+    }
+}
+
+// Handle preflight requests early
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    // return only the headers and exit
+    http_response_code(204);
+    exit;
+}
+
 require_once __DIR__ . '/../app/Core/Request.php';
 require_once __DIR__ . '/../app/Core/Response.php';
 require_once __DIR__ . '/../app/Core/RouterService.php';

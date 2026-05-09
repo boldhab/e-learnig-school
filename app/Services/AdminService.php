@@ -51,4 +51,39 @@ class AdminService {
         
         return $stats;
     }
+
+    public function getRecentLogs() {
+        $db = \App\Core\Database::getInstance();
+        
+        $logs = [];
+        
+        // New Users
+        $newUsers = $db->query("
+            SELECT 'USER' as type, CONCAT('New user registered: ', full_name) as msg, created_at as time, 'blue' as color 
+            FROM users 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ")->fetchAll();
+        
+        // Logins (if table exists, otherwise just return users for now)
+        try {
+            $logins = $db->query("
+                SELECT 'SECURITY' as type, CONCAT('User login: ', u.username) as msg, l.created_at as time, 'purple' as color 
+                FROM login_logs l
+                JOIN users u ON l.user_id = u.id
+                ORDER BY l.created_at DESC 
+                LIMIT 5
+            ")->fetchAll();
+            $logs = array_merge($newUsers, $logins);
+        } catch (\Exception $e) {
+            $logs = $newUsers;
+        }
+
+        // Sort by time
+        usort($logs, function($a, $b) {
+            return strtotime($b['time']) - strtotime($a['time']);
+        });
+
+        return array_slice($logs, 0, 10);
+    }
 }

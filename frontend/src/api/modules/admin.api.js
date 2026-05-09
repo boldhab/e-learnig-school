@@ -3,6 +3,9 @@ import api from "../axios.config";
 const adminApi = {
   // User Management
   getUsers: () => api.get("admin/users"),
+  updateUser: (data) => api.post("admin/users/update", data),
+  deleteUser: (id) => api.post("admin/users/delete", { id }),
+  resetPassword: (id, password) => api.post("admin/users/reset-password", { id, password }),
   createStudent: (data) => api.post("admin/students", data),
   createTeacher: (data) => api.post("admin/teachers", data),
   updateUserStatus: (id, status) => api.post("admin/users/status", { id, status }),
@@ -15,6 +18,10 @@ const adminApi = {
   // Stats & Overview
   getDashboardStats: () => api.get("admin/stats"),
   getActivityLogs: () => api.get("admin/logs"),
+
+  // Class & Course Lists
+  getClasses: () => api.get("admin/classes"),
+  getCourses: () => api.get("admin/courses"),
 
   // System
   backupSystem: () => api.post("admin/backup"),

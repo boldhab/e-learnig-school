@@ -10,12 +10,18 @@ class AuthMiddleware {
     public function handle(Request $request, Response $response) {
         $headers = $request->getHeaders();
         $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        $token = '';
 
-        if (!$authHeader || strpos($authHeader, 'Bearer ') !== 0) {
+        if ($authHeader && strpos($authHeader, 'Bearer ') === 0) {
+            $token = substr($authHeader, 7);
+        } elseif (isset($_GET['token'])) {
+            $token = $_GET['token'];
+        }
+
+        if (!$token) {
             $response->json([], 'error', 'Unauthorized: Token missing', 401);
         }
 
-        $token = substr($authHeader, 7);
         $userData = JwtHelper::verify($token);
 
         if (!$userData) {
