@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import StudentRoutes from './routes/StudentRoutes';
+import TeacherRoutes from './routes/TeacherRoutes';
 import { SkeletonLoader } from './components/common/UIComponents';
 
 // Loading component
@@ -40,6 +41,14 @@ function App() {
               element={
                 <Suspense fallback={<LoadingComponent />}>
                   <StudentRoutes />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/teacher/*"
+              element={
+                <Suspense fallback={<LoadingComponent />}>
+                  <TeacherRoutes />
                 </Suspense>
               }
             />
