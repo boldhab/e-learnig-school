@@ -42,4 +42,9 @@ class Request {
     public function getHeaders() {
         return getallheaders();
     }
+
+    public function getHeader($name) {
+        $headers = $this->getHeaders();
+        return $headers[$name] ?? $headers[strtolower($name)] ?? null;
+    }
 }

@@ -69,7 +69,7 @@ class DiscussionService {
         return $this->topicRepo->findByGroup($groupId);
     }
 
-    public function postMessage($data) {
+    public function postMessage($data, ?string $socketId = null) {
         $topic = $this->topicRepo->findById($data['topic_id']);
         if (!$topic) {
             throw new Exception("Topic not found.");
@@ -77,7 +77,24 @@ class DiscussionService {
         if ($topic['status'] === 'closed') {
             throw new Exception("This topic is closed for new messages.");
         }
-        return $this->messageRepo->create($data);
+        
+        $id = $this->messageRepo->create($data);
+        
+        // Fetch full message with author info for broadcasting
+        $messages = $this->messageRepo->getByTopic($data['topic_id']);
+        $fullMessage = null;
+        foreach ($messages as $m) {
+            if ($m['id'] == $id) {
+                $fullMessage = $m;
+                break;
+            }
+        }
+
+        if ($fullMessage) {
+            event(new \App\Events\Discussion\NewMessageEvent($fullMessage), $socketId);
+        }
+
+        return $id;
     }
 
     public function getMessages($topicId) {

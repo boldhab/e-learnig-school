@@ -48,6 +48,14 @@ $router->get('/api/student/submissions', [\App\Controllers\SubmissionController:
 $router->post('/api/submissions/{id}/grade', [\App\Controllers\GradingController::class, 'grade']);
 $router->post('/api/grades/publish', [\App\Controllers\GradingController::class, 'publish']);
 
+// Course Routes
+$router->get('courses', 'CourseController@list');
+
+// Material Routes
+$router->get('materials', 'MaterialController@list');
+$router->post('materials/upload', 'MaterialController@upload');
+$router->delete('materials/{id}', 'MaterialController@delete');
+
 // Discussion Routes
 $router->get('/api/discussions/groups', [\App\Controllers\DiscussionController::class, 'getGroups']);
 $router->get('/api/discussions/groups/{id}/topics', [\App\Controllers\DiscussionController::class, 'listTopics']);

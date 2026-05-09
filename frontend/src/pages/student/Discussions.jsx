@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Search, MessageCircle, ThumbsUp, Reply, Send, User, Loader2, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, MessageCircle, ThumbsUp, Reply, Send, User, Loader2, ChevronRight, Wifi, WifiOff } from 'lucide-react';
 import { COLORS } from '../../constants/theme';
 import communicationApi from '../../api/modules/communication.api';
+import { useDiscussionSocket } from '../../hooks/useDiscussionSocket';
+import pusher from '../../services/socket';
 
 // Group Item
 const GroupItem = ({ group, isActive, onClick }) => (
@@ -62,13 +64,14 @@ const TopicItem = ({ topic, isActive, onClick }) => (
 // Message Bubble Component
 const MessageBubble = ({ message }) => {
   const isTeacher = message.author_role === 'TEACHER';
+  const isSending = message.status === 'sending';
   
   return (
     <motion.div
       className="mb-4 flex"
       style={{ justifyContent: isTeacher ? 'flex-start' : 'flex-end' }}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
     >
       <div className={`flex gap-3 max-w-[80%] ${isTeacher ? 'flex-row' : 'flex-row-reverse'}`}>
         <div
@@ -82,7 +85,7 @@ const MessageBubble = ({ message }) => {
             {message.author_name} {isTeacher && '(Teacher)'}
           </p>
           <div
-            className={`p-3 rounded-2xl ${isTeacher ? 'rounded-tl-none' : 'rounded-tr-none'}`}
+            className={`p-3 rounded-2xl transition-all ${isTeacher ? 'rounded-tl-none' : 'rounded-tr-none'} ${isSending ? 'opacity-70' : 'opacity-100'}`}
             style={{
               backgroundColor: isTeacher ? '#F1F5F9' : COLORS.PRIMARY_BLUE,
               color: isTeacher ? COLORS.TEXT_PRIMARY : '#FFFFFF',
@@ -90,9 +93,11 @@ const MessageBubble = ({ message }) => {
           >
             <p className="text-sm">{message.message}</p>
           </div>
-          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-[10px] mt-1">
-            {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
+          <div className="flex items-center justify-end gap-1 mt-1">
+            <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-[10px]">
+              {isSending ? 'Sending...' : new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -104,6 +109,11 @@ const DiscussionThread = ({ topic }) => {
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const fetchMessages = useCallback(async () => {
     if (!topic) return;
@@ -122,15 +132,48 @@ const DiscussionThread = ({ topic }) => {
     fetchMessages();
   }, [fetchMessages]);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Real-time listener
+  useDiscussionSocket(topic?.id, (newMessage) => {
+    setMessages((prev) => {
+      // Deduplicate: replace optimistic message with real one if IDs match (not possible since optimistic has no real ID yet)
+      // Or just check if message content and user match for the last message
+      if (prev.some(m => m.id === newMessage.id)) return prev;
+      return [...prev, newMessage];
+    });
+  });
+
   const handleSendReply = async () => {
     if (!replyText.trim()) return;
     
+    const text = replyText;
+    setReplyText('');
+
+    // OPTIMISTIC UPDATE
+    const optimisticMessage = {
+      id: Date.now(), // temporary ID
+      message: text,
+      author_name: 'You',
+      author_role: 'STUDENT',
+      created_at: new Date().toISOString(),
+      status: 'sending'
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
-      await communicationApi.sendMessage(topic.id, { message: replyText });
-      setReplyText('');
-      fetchMessages(); // Refresh messages
+      await communicationApi.sendMessage(topic.id, { message: text });
+      // The socket event will arrive (excluding us) OR we could fetch
+      // Since we use X-Socket-ID, the server won't broadcast back to us.
+      // So we should update our optimistic message to 'sent' or replace with real data.
+      fetchMessages(); 
     } catch (error) {
       console.error("Failed to send message:", error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
       alert("Failed to send message. Please try again.");
     }
   };
@@ -145,19 +188,21 @@ const DiscussionThread = ({ topic }) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl border flex flex-col h-[600px]" style={{ borderColor: COLORS.BORDER }}>
+    <div className="bg-white rounded-2xl border flex flex-col h-[600px] shadow-sm" style={{ borderColor: COLORS.BORDER }}>
       {/* Thread Header */}
-      <div className="p-6 border-b bg-gray-50 rounded-t-2xl" style={{ borderColor: COLORS.BORDER }}>
-        <h2 className="text-xl font-bold mb-1" style={{ color: COLORS.TEXT_PRIMARY }}>
-          {topic.title}
-        </h2>
-        <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs">
-          Started by {topic.author_name} • {new Date(topic.created_at).toLocaleDateString()}
-        </p>
+      <div className="p-6 border-b bg-gray-50 rounded-t-2xl flex justify-between items-center" style={{ borderColor: COLORS.BORDER }}>
+        <div>
+          <h2 className="text-xl font-bold mb-1" style={{ color: COLORS.TEXT_PRIMARY }}>
+            {topic.title}
+          </h2>
+          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs">
+            Started by {topic.author_name} • {new Date(topic.created_at).toLocaleDateString()}
+          </p>
+        </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 p-6 overflow-y-auto space-y-4">
+      <div className="flex-1 p-6 overflow-y-auto space-y-4 scroll-smooth">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-200">
@@ -171,6 +216,7 @@ const DiscussionThread = ({ topic }) => {
             <MessageBubble key={message.id} message={message} />
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Reply Input */}
@@ -180,8 +226,14 @@ const DiscussionThread = ({ topic }) => {
             <textarea
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendReply();
+                }
+              }}
               placeholder="Type your message..."
-              className="flex-1 p-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+              className="flex-1 p-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all"
               style={{ borderColor: COLORS.BORDER }}
               rows="2"
             />
@@ -190,7 +242,7 @@ const DiscussionThread = ({ topic }) => {
               disabled={!replyText.trim()}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-5 rounded-xl font-semibold flex items-center justify-center bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 rounded-xl font-semibold flex items-center justify-center bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
             >
               <Send size={18} />
             </motion.button>
@@ -213,6 +265,19 @@ const DiscussionsPage = () => {
   const [activeTopic, setActiveTopic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+
+  // Monitor connection
+  useEffect(() => {
+    if (pusher && pusher.connection) {
+      const handleStateChange = (states) => {
+        setConnectionStatus(states.current);
+      };
+      pusher.connection.bind('state_change', handleStateChange);
+      setConnectionStatus(pusher.connection.state);
+      return () => pusher.connection.unbind('state_change', handleStateChange);
+    }
+  }, []);
 
   // Fetch initial groups
   useEffect(() => {
@@ -262,9 +327,19 @@ const DiscussionsPage = () => {
 
   return (
     <div className="p-6 pb-12 max-w-7xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-slate-900">Discussion Forum</h1>
-        <p className="text-slate-500">Collaborate with classmates and teachers in real-time topics.</p>
+      <header className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 text-slate-900">Discussion Forum</h1>
+          <p className="text-slate-500">Collaborate with classmates and teachers in real-time topics.</p>
+        </div>
+        
+        {/* Connection Status Indicator */}
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
+          connectionStatus === 'connected' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
+        }`}>
+          {connectionStatus === 'connected' ? <Wifi size={14} /> : <WifiOff size={14} />}
+          <span className="capitalize">{connectionStatus}</span>
+        </div>
       </header>
 
       {groups.length === 0 ? (
@@ -300,7 +375,7 @@ const DiscussionsPage = () => {
             </section>
 
             {/* Topics List */}
-            <section className="bg-white rounded-2xl border p-4" style={{ borderColor: COLORS.BORDER }}>
+            <section className="bg-white rounded-2xl border p-4 shadow-sm" style={{ borderColor: COLORS.BORDER }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-slate-900">Topics</h2>
                 <div className="relative">
@@ -315,7 +390,7 @@ const DiscussionsPage = () => {
                 </div>
               </div>
               
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                 {filteredTopics.length === 0 ? (
                   <p className="text-center py-8 text-xs text-slate-400">No topics found.</p>
                 ) : (
@@ -334,19 +409,28 @@ const DiscussionsPage = () => {
 
           {/* Right Column: Messages */}
           <div className="lg:col-span-8">
-            {activeTopic ? (
-              <DiscussionThread topic={activeTopic} />
-            ) : (
-              <div className="bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center h-[600px] text-center p-12" style={{ borderColor: COLORS.BORDER }}>
-                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6 text-blue-200">
-                  <Reply size={40} className="transform -rotate-12" />
+            <AnimatePresence mode="wait">
+              {activeTopic ? (
+                <motion.div
+                  key={activeTopic.id}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                >
+                  <DiscussionThread topic={activeTopic} />
+                </motion.div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center h-[600px] text-center p-12" style={{ borderColor: COLORS.BORDER }}>
+                  <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6 text-blue-200">
+                    <Reply size={40} className="transform -rotate-12" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-slate-900 mb-2">Select a Topic</h2>
+                  <p className="text-slate-500 max-w-sm">
+                    Choose a topic from the sidebar to view the conversation and join the discussion.
+                  </p>
                 </div>
-                <h2 className="text-xl font-semibold text-slate-900 mb-2">Select a Topic</h2>
-                <p className="text-slate-500 max-w-sm">
-                  Choose a topic from the sidebar to view the conversation and join the discussion.
-                </p>
-              </div>
-            )}
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}

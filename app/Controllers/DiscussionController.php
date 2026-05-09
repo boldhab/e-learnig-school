@@ -70,9 +70,11 @@ class DiscussionController extends BaseController {
         $data = HtmlSanitizer::sanitize($request->getBody());
         $data['topic_id'] = $topicId;
         $data['user_id'] = $GLOBALS['auth_user']['id'];
+        
+        $socketId = $request->getHeader('X-Socket-ID');
 
         try {
-            $id = $this->discussionService->postMessage($data);
+            $id = $this->discussionService->postMessage($data, $socketId);
             $this->success(['message_id' => $id], 'Message posted successfully', 201);
         } catch (Exception $e) {
             $this->error($e->getMessage());
