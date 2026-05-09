@@ -97,4 +97,11 @@ class UserRepository {
         $stmt = $this->db->prepare($sql);
         return $stmt->execute(['id' => $userId, 'class_id' => $classId]);
     }
+
+    public function getStudentsByClass($classId) {
+        $sql = "SELECT id FROM users WHERE class_id = :class_id AND role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT')";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['class_id' => $classId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
 }

@@ -50,7 +50,7 @@ class SubmissionRepository {
     }
 
     public function findById($id) {
-        $sql = "SELECT s.*, a.max_marks FROM submissions s JOIN assignments a ON s.assignment_id = a.id WHERE s.id = :id";
+        $sql = "SELECT s.*, a.title, a.max_marks FROM submissions s JOIN assignments a ON s.assignment_id = a.id WHERE s.id = :id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();

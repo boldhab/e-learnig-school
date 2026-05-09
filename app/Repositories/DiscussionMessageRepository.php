@@ -26,9 +26,10 @@ class DiscussionMessageRepository {
     }
 
     public function getByTopic($topicId) {
-        $sql = "SELECT m.*, u.full_name as author_name, u.username as author_username 
+        $sql = "SELECT m.*, u.full_name as author_name, u.username as author_username, r.role_name as author_role
                 FROM discussion_messages m 
                 JOIN users u ON m.user_id = u.id 
+                JOIN roles r ON u.role_id = r.id
                 WHERE m.topic_id = :topic_id AND m.deleted_at IS NULL 
                 ORDER BY m.created_at ASC";
         $stmt = $this->db->prepare($sql);

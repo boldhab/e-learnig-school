@@ -25,7 +25,7 @@ class SupportTicketRepository {
             'priority' => $data['priority'] ?? 'medium'
         ]);
         
-        return $this->db->lastInsertId();
+        return (int)$this->db->lastInsertId();
     }
 
     public function createReply(array $data): int {
@@ -39,10 +39,12 @@ class SupportTicketRepository {
             'message' => $data['message']
         ]);
         
+        $replyId = (int)$this->db->lastInsertId();
+        
         // Update ticket updated_at
         $this->db->prepare("UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$data['ticket_id']]);
         
-        return $this->db->lastInsertId();
+        return $replyId;
     }
 
     public function getUserTickets(int $userId): array {
@@ -72,7 +74,7 @@ class SupportTicketRepository {
         $ticket = $stmt->fetch();
         
         if (!$ticket) return null;
-
+        
         // Fetch replies
         $replySql = "SELECT r.*, u.full_name, u.role_id 
                      FROM support_ticket_replies r 

@@ -33,4 +33,22 @@ class DiscussionGroupRepository {
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
     }
+
+    public function getGroupsByStudent($classId) {
+        $sql = "SELECT dg.* FROM discussion_groups dg
+                JOIN teacher_assignments ta ON dg.course_id = ta.course_id
+                WHERE ta.class_id = :class_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['class_id' => $classId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getGroupsByTeacher($teacherId) {
+        $sql = "SELECT dg.* FROM discussion_groups dg
+                JOIN teacher_assignments ta ON dg.course_id = ta.course_id
+                WHERE ta.teacher_id = :teacher_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['teacher_id' => $teacherId]);
+        return $stmt->fetchAll();
+    }
 }

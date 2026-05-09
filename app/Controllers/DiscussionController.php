@@ -15,6 +15,22 @@ class DiscussionController extends BaseController {
         $this->discussionService = new DiscussionService();
     }
 
+    public function getGroups(Request $request, Response $response) {
+        $this->requireAuth();
+        $user = $GLOBALS['auth_user'];
+        
+        try {
+            $groups = $this->discussionService->getUserGroups(
+                $user['id'], 
+                $user['role_name'], 
+                $user['class_id'] ?? null
+            );
+            $this->success($groups);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
     public function getCourseDiscussion(Request $request, Response $response, $courseId) {
         $this->requireAuth();
         try {
@@ -41,8 +57,12 @@ class DiscussionController extends BaseController {
 
     public function listTopics(Request $request, Response $response, $groupId) {
         $this->requireAuth();
-        $topics = $this->discussionService->getTopics($groupId);
-        $this->success($topics);
+        try {
+            $topics = $this->discussionService->getTopics($groupId);
+            $this->success($topics);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 
     public function postMessage(Request $request, Response $response, $topicId) {
@@ -61,8 +81,12 @@ class DiscussionController extends BaseController {
 
     public function listMessages(Request $request, Response $response, $topicId) {
         $this->requireAuth();
-        $messages = $this->discussionService->getMessages($topicId);
-        $this->success($messages);
+        try {
+            $messages = $this->discussionService->getMessages($topicId);
+            $this->success($messages);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
     }
 
     public function deleteMessage(Request $request, Response $response, $messageId) {

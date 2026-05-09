@@ -1,9 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MessageCircle, ThumbsUp, Reply, Send, User } from 'lucide-react';
+import { Search, MessageCircle, ThumbsUp, Reply, Send, User, Loader2, ChevronRight } from 'lucide-react';
 import { COLORS } from '../../constants/theme';
+import communicationApi from '../../api/modules/communication.api';
 
-// Discussion Topic Item
+// Group Item
+const GroupItem = ({ group, isActive, onClick }) => (
+  <motion.button
+    onClick={onClick}
+    className="w-full text-left p-4 rounded-lg border mb-2 transition-all flex items-center justify-between"
+    style={{
+      borderColor: isActive ? COLORS.PRIMARY_BLUE : COLORS.BORDER,
+      backgroundColor: isActive ? `${COLORS.PRIMARY_BLUE}10` : '#FFFFFF',
+    }}
+    whileHover={{ x: 4 }}
+  >
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-lg bg-blue-50">
+        <MessageCircle size={18} className="text-blue-600" />
+      </div>
+      <h3 className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
+        {group.title}
+      </h3>
+    </div>
+    <ChevronRight size={16} className={isActive ? 'text-blue-600' : 'text-gray-400'} />
+  </motion.button>
+);
+
+// Topic Item
 const TopicItem = ({ topic, isActive, onClick }) => (
   <motion.button
     onClick={onClick}
@@ -15,353 +39,317 @@ const TopicItem = ({ topic, isActive, onClick }) => (
     whileHover={{ x: 4 }}
   >
     <div className="flex items-start justify-between mb-2">
-      <h3 className="font-semibold flex-1" style={{ color: COLORS.TEXT_PRIMARY }}>
+      <h3 className="font-semibold flex-1 text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
         {topic.title}
       </h3>
-      <span
-        className="text-xs font-semibold px-2 py-1 rounded-full"
-        style={{
-          backgroundColor: `${COLORS.PRIMARY_BLUE}15`,
-          color: COLORS.PRIMARY_BLUE,
-        }}
-      >
-        {topic.replies}
-      </span>
+      {topic.status === 'closed' && (
+        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-bold">
+          Closed
+        </span>
+      )}
     </div>
-    <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm mb-2">
-      {topic.preview}
-    </p>
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between mt-2">
       <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs">
-        {topic.author}
+        By {topic.author_name}
       </p>
-      <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs">
-        {topic.lastActivity}
+      <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-[10px]">
+        {new Date(topic.created_at).toLocaleDateString()}
       </p>
     </div>
   </motion.button>
 );
 
 // Message Bubble Component
-const MessageBubble = ({ message, isTeacher }) => (
-  <motion.div
-    className="mb-4 flex"
-    style={{ justifyContent: isTeacher ? 'flex-start' : 'flex-end' }}
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.1 }}
-  >
-    <div className="flex gap-3 max-w-xs">
-      {isTeacher && (
+const MessageBubble = ({ message }) => {
+  const isTeacher = message.author_role === 'TEACHER';
+  
+  return (
+    <motion.div
+      className="mb-4 flex"
+      style={{ justifyContent: isTeacher ? 'flex-start' : 'flex-end' }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className={`flex gap-3 max-w-[80%] ${isTeacher ? 'flex-row' : 'flex-row-reverse'}`}>
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-          style={{ backgroundColor: COLORS.INDIGO }}
+          style={{ backgroundColor: isTeacher ? COLORS.INDIGO : COLORS.PRIMARY_BLUE }}
         >
-          {message.author.charAt(0)}
+          {message.author_name.charAt(0)}
         </div>
-      )}
-      <div className="flex-1">
-        {isTeacher && (
-          <p className="text-xs font-semibold mb-1" style={{ color: COLORS.INDIGO }}>
-            {message.author}
-            {message.isTeacher && ' (Teacher)'}
+        <div className={isTeacher ? 'text-left' : 'text-right'}>
+          <p className="text-[10px] font-semibold mb-1" style={{ color: isTeacher ? COLORS.INDIGO : COLORS.PRIMARY_BLUE }}>
+            {message.author_name} {isTeacher && '(Teacher)'}
           </p>
-        )}
-        <div
-          className="p-3 rounded-2xl"
-          style={{
-            backgroundColor: isTeacher ? `${COLORS.PRIMARY_BLUE}15` : COLORS.PRIMARY_BLUE,
-            color: isTeacher ? COLORS.TEXT_PRIMARY : '#FFFFFF',
-          }}
-        >
-          <p className="text-sm">{message.content}</p>
+          <div
+            className={`p-3 rounded-2xl ${isTeacher ? 'rounded-tl-none' : 'rounded-tr-none'}`}
+            style={{
+              backgroundColor: isTeacher ? '#F1F5F9' : COLORS.PRIMARY_BLUE,
+              color: isTeacher ? COLORS.TEXT_PRIMARY : '#FFFFFF',
+            }}
+          >
+            <p className="text-sm">{message.message}</p>
+          </div>
+          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-[10px] mt-1">
+            {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
-        <p
-          style={{ color: COLORS.TEXT_SECONDARY }}
-          className="text-xs mt-1"
-        >
-          {message.time}
-        </p>
       </div>
-      {!isTeacher && (
-        <div className="flex gap-2">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-2 rounded-full hover:bg-gray-100"
-          >
-            <ThumbsUp size={16} style={{ color: COLORS.TEXT_SECONDARY }} />
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="p-2 rounded-full hover:bg-gray-100"
-          >
-            <Reply size={16} style={{ color: COLORS.TEXT_SECONDARY }} />
-          </motion.button>
-        </div>
-      )}
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 // Discussion Thread Component
 const DiscussionThread = ({ topic }) => {
-  const [messages, setMessages] = useState(topic.messages);
+  const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendReply = () => {
-    if (replyText.trim()) {
-      setMessages([
-        ...messages,
-        {
-          id: messages.length + 1,
-          author: 'You',
-          content: replyText,
-          time: 'just now',
-          isTeacher: false,
-        },
-      ]);
+  const fetchMessages = useCallback(async () => {
+    if (!topic) return;
+    setLoading(true);
+    try {
+      const response = await communicationApi.getMessages(topic.id);
+      setMessages(response.data.data);
+    } catch (error) {
+      console.error("Failed to fetch messages:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [topic]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return;
+    
+    try {
+      await communicationApi.sendMessage(topic.id, { message: replyText });
       setReplyText('');
+      fetchMessages(); // Refresh messages
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      alert("Failed to send message. Please try again.");
     }
   };
 
+  if (loading && messages.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border p-12 flex flex-col items-center justify-center" style={{ borderColor: COLORS.BORDER }}>
+        <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
+        <p className="text-gray-500">Loading conversation...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-2xl border p-6" style={{ borderColor: COLORS.BORDER }}>
+    <div className="bg-white rounded-2xl border flex flex-col h-[600px]" style={{ borderColor: COLORS.BORDER }}>
       {/* Thread Header */}
-      <div className="mb-6 pb-6 border-b" style={{ borderColor: COLORS.BORDER }}>
-        <h2 className="text-2xl font-bold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
+      <div className="p-6 border-b bg-gray-50 rounded-t-2xl" style={{ borderColor: COLORS.BORDER }}>
+        <h2 className="text-xl font-bold mb-1" style={{ color: COLORS.TEXT_PRIMARY }}>
           {topic.title}
         </h2>
-        <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm mb-3">
-          Started by {topic.author} • {topic.replies} replies
-        </p>
-        <p style={{ color: COLORS.TEXT_PRIMARY }} className="text-sm">
-          {topic.description}
+        <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-xs">
+          Started by {topic.author_name} • {new Date(topic.created_at).toLocaleDateString()}
         </p>
       </div>
 
       {/* Messages */}
-      <div className="space-y-4 mb-8 h-96 overflow-y-auto">
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            isTeacher={message.isTeacher}
-          />
-        ))}
+      <div className="flex-1 p-6 overflow-y-auto space-y-4">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-200">
+              <MessageCircle size={32} />
+            </div>
+            <p className="text-gray-500 font-medium">No messages yet.</p>
+            <p className="text-gray-400 text-sm">Be the first to start the discussion!</p>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))
+        )}
       </div>
 
       {/* Reply Input */}
-      <div className="border-t pt-4" style={{ borderColor: COLORS.BORDER }}>
-        <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-          Add your reply
-        </label>
-        <div className="flex gap-2">
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Share your thoughts..."
-            className="flex-1 p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-opacity-20"
-            style={{
-              borderColor: COLORS.BORDER,
-              focusRingColor: COLORS.PRIMARY_BLUE,
-            }}
-            rows="3"
-          />
-          <motion.button
-            onClick={handleSendReply}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
-            style={{
-              backgroundColor: COLORS.PRIMARY_BLUE,
-              color: '#FFFFFF',
-            }}
-          >
-            <Send size={16} />
-            Send
-          </motion.button>
+      {topic.status === 'open' ? (
+        <div className="p-4 border-t" style={{ borderColor: COLORS.BORDER }}>
+          <div className="flex gap-2">
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 p-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+              style={{ borderColor: COLORS.BORDER }}
+              rows="2"
+            />
+            <motion.button
+              onClick={handleSendReply}
+              disabled={!replyText.trim()}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-5 rounded-xl font-semibold flex items-center justify-center bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send size={18} />
+            </motion.button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-4 bg-red-50 text-red-600 text-center text-sm font-medium border-t border-red-100">
+          This topic is closed for new replies.
+        </div>
+      )}
     </div>
   );
 };
 
 // Main Discussions Page
 const DiscussionsPage = () => {
+  const [groups, setGroups] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState(null);
 
-  const topics = [
-    {
-      id: 1,
-      title: 'React Hooks Best Practices',
-      author: 'Prof. John Smith',
-      preview: 'What are the best practices when using React hooks in production...',
-      replies: 24,
-      lastActivity: '2 hours ago',
-      description: 'This discussion covers the best practices and patterns for using React hooks effectively in production applications.',
-      messages: [
-        {
-          id: 1,
-          author: 'Prof. John Smith',
-          content: 'What are the best practices when using React hooks in production applications? Share your experiences!',
-          time: '2 days ago',
-          isTeacher: true,
-        },
-        {
-          id: 2,
-          author: 'Alex Kumar',
-          content: 'Always keep hooks at the top level of your component. Avoid calling hooks inside loops or conditionals.',
-          time: '2 days ago',
-          isTeacher: false,
-        },
-        {
-          id: 3,
-          author: 'Prof. John Smith',
-          content: 'Exactly right! And remember to use custom hooks to extract component logic into reusable functions.',
-          time: '1 day ago',
-          isTeacher: true,
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: 'Database Optimization Techniques',
-      author: 'Dr. Sarah Johnson',
-      preview: 'How to optimize queries for better performance...',
-      replies: 18,
-      lastActivity: '4 hours ago',
-      description: 'Discussion about various database optimization techniques and query performance tuning.',
-      messages: [
-        {
-          id: 1,
-          author: 'Dr. Sarah Johnson',
-          content: 'What techniques do you use to optimize slow queries?',
-          time: '3 days ago',
-          isTeacher: true,
-        },
-        {
-          id: 2,
-          author: 'Sarah',
-          content: 'Indexing is crucial! Always analyze execution plans before optimizing.',
-          time: '2 days ago',
-          isTeacher: false,
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: 'Cloud Storage Solutions',
-      author: 'Alex Kumar',
-      preview: 'Comparing AWS S3, Azure Blob Storage, and GCP...',
-      replies: 12,
-      lastActivity: '1 day ago',
-      description: 'Comprehensive discussion comparing different cloud storage solutions.',
-      messages: [
-        {
-          id: 1,
-          author: 'Alex Kumar',
-          content: 'Which cloud storage solution do you prefer for production use?',
-          time: '3 days ago',
-          isTeacher: false,
-        },
-      ],
-    },
-    {
-      id: 4,
-      title: 'UI Design Trends 2024',
-      author: 'Emma Wilson',
-      preview: 'What design trends are you noticing in modern applications?',
-      replies: 31,
-      lastActivity: '1 hour ago',
-      description: 'Current UI/UX design trends and their implementation in modern web applications.',
-      messages: [
-        {
-          id: 1,
-          author: 'Emma Wilson',
-          content: 'What design trends are you noticing in modern applications?',
-          time: '5 days ago',
-          isTeacher: false,
-        },
-      ],
-    },
-  ];
+  // Fetch initial groups
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const response = await communicationApi.getGroups();
+        const groupData = response.data.data;
+        setGroups(groupData);
+        if (groupData.length > 0) {
+          setSelectedGroup(groupData[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch groups:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGroups();
+  }, []);
 
-  const filteredTopics = topics.filter(
-    (topic) =>
-      topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      topic.description.toLowerCase().includes(searchQuery.toLowerCase())
+  // Fetch topics when group changes
+  useEffect(() => {
+    const fetchTopics = async () => {
+      if (!selectedGroup) return;
+      try {
+        const response = await communicationApi.getTopics(selectedGroup.id);
+        setTopics(response.data.data);
+        setActiveTopic(null); // Reset active topic when group changes
+      } catch (error) {
+        console.error("Failed to fetch topics:", error);
+      }
+    };
+    fetchTopics();
+  }, [selectedGroup]);
+
+  const filteredTopics = topics.filter((t) =>
+    t.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeTopic = selectedTopic || filteredTopics[0];
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 pb-12">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-          Discussion Forum
-        </h1>
-        <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-lg">
-          Join conversations and learn from your peers
-        </p>
-      </motion.div>
+    <div className="p-6 pb-12 max-w-7xl mx-auto">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold mb-2 text-slate-900">Discussion Forum</h1>
+        <p className="text-slate-500">Collaborate with classmates and teachers in real-time topics.</p>
+      </header>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Topics Sidebar */}
-        <motion.div
-          className="lg:col-span-1"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          {/* Search Topics */}
-          <div className="mb-6 relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search discussions..."
-              className="w-full px-4 py-2.5 pr-10 bg-white rounded-lg border focus:outline-none focus:ring-2 focus:ring-opacity-20"
-              style={{
-                borderColor: COLORS.BORDER,
-              }}
-            />
-            <Search
-              size={18}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              style={{ color: COLORS.TEXT_SECONDARY }}
-            />
+      {groups.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
+          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MessageCircle size={40} className="text-slate-300" />
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">No Discussion Groups</h2>
+          <p className="text-slate-500 max-w-md mx-auto">
+            You haven't been assigned to any discussion groups yet. 
+            Groups are automatically created for your enrolled courses.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left Column: Groups & Topics */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Group Selector */}
+            <section>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">
+                My Course Groups
+              </h2>
+              <div className="space-y-1">
+                {groups.map((group) => (
+                  <GroupItem
+                    key={group.id}
+                    group={group}
+                    isActive={selectedGroup?.id === group.id}
+                    onClick={() => setSelectedGroup(group)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {/* Topics List */}
+            <section className="bg-white rounded-2xl border p-4" style={{ borderColor: COLORS.BORDER }}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-slate-900">Topics</h2>
+                <div className="relative">
+                  <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search..."
+                    className="pl-8 pr-3 py-1.5 bg-slate-50 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/30 w-32"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                {filteredTopics.length === 0 ? (
+                  <p className="text-center py-8 text-xs text-slate-400">No topics found.</p>
+                ) : (
+                  filteredTopics.map((topic) => (
+                    <TopicItem
+                      key={topic.id}
+                      topic={topic}
+                      isActive={activeTopic?.id === topic.id}
+                      onClick={() => setActiveTopic(topic)}
+                    />
+                  ))
+                )}
+              </div>
+            </section>
           </div>
 
-          {/* Topics List */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {filteredTopics.map((topic) => (
-              <TopicItem
-                key={topic.id}
-                topic={topic}
-                isActive={activeTopic?.id === topic.id}
-                onClick={() => setSelectedTopic(topic)}
-              />
-            ))}
+          {/* Right Column: Messages */}
+          <div className="lg:col-span-8">
+            {activeTopic ? (
+              <DiscussionThread topic={activeTopic} />
+            ) : (
+              <div className="bg-white rounded-2xl border border-dashed flex flex-col items-center justify-center h-[600px] text-center p-12" style={{ borderColor: COLORS.BORDER }}>
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6 text-blue-200">
+                  <Reply size={40} className="transform -rotate-12" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900 mb-2">Select a Topic</h2>
+                <p className="text-slate-500 max-w-sm">
+                  Choose a topic from the sidebar to view the conversation and join the discussion.
+                </p>
+              </div>
+            )}
           </div>
-        </motion.div>
-
-        {/* Discussion Thread */}
-        <motion.div
-          className="lg:col-span-2"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          {activeTopic && <DiscussionThread topic={activeTopic} />}
-        </motion.div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -3,16 +3,25 @@
 namespace App\Services;
 
 use App\Repositories\AssignmentRepository;
+use App\Repositories\UserRepository;
 use App\Helpers\CloudinaryHelper;
+use App\Core\Database;
 use Exception;
+use PDO;
 
 class AssignmentService {
     protected $assignmentRepository;
+    protected $userRepository;
     protected $cloudinaryHelper;
+    protected $notificationService;
+    protected $db;
 
     public function __construct() {
         $this->assignmentRepository = new AssignmentRepository();
+        $this->userRepository = new UserRepository();
         $this->cloudinaryHelper = new CloudinaryHelper();
+        $this->notificationService = new NotificationService();
+        $this->db = Database::getInstance();
     }
 
     public function createAssignment($data, $file = null) {
@@ -29,7 +38,24 @@ class AssignmentService {
             }
         }
 
-        return $this->assignmentRepository->create($data);
+        $id = $this->assignmentRepository->create($data);
+
+        if ($id) {
+            // STEP H-01: Automatic Assignment Notification
+            // Find all classes this course is assigned to
+            $stmt = $this->db->prepare("SELECT class_id FROM teacher_assignments WHERE course_id = ?");
+            $stmt->execute([$data['course_id']]);
+            $classIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($classIds as $classId) {
+                $studentIds = $this->userRepository->getStudentsByClass($classId);
+                foreach ($studentIds as $studentId) {
+                    $this->notificationService->notifyAssignmentCreated($studentId, $id, $data['title']);
+                }
+            }
+        }
+
+        return $id;
     }
 
     public function getAssignment($id) {

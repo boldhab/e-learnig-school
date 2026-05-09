@@ -37,6 +37,27 @@ class DiscussionService {
         return $group;
     }
 
+    public function getUserGroups($userId, $role, $classId = null) {
+        if ($role === 'ADMIN') {
+            // Admin could see all, but let's keep it clean for now
+            // Maybe just return all groups or empty for admin dashboard
+            return []; 
+        }
+
+        if ($role === 'TEACHER') {
+            return $this->groupRepo->getGroupsByTeacher($userId);
+        }
+
+        if ($role === 'STUDENT') {
+            if (!$classId) {
+                return [];
+            }
+            return $this->groupRepo->getGroupsByStudent($classId);
+        }
+
+        return [];
+    }
+
     public function createTopic($data) {
         if (empty($data['title'])) {
             throw new Exception("Topic title is required.");
