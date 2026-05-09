@@ -4,6 +4,13 @@ use App\Core\Router;
 use App\Controllers\AuthController;
 use App\Controllers\AdminController;
 use App\Controllers\UserController;
+use App\Controllers\AttendanceController;
+use App\Controllers\PerformanceController;
+use App\Controllers\GapAnalysisController;
+use App\Controllers\NotificationController;
+use App\Controllers\AnnouncementController;
+use App\Controllers\HelpController;
+use App\Controllers\SupportTicketController;
 
 /** @var Router $router */
 
@@ -61,3 +68,50 @@ $router->post('/api/change-password', [UserController::class, 'changePassword'])
 $router->post('/api/materials/upload', [\App\Controllers\ContentController::class, 'upload']);
 $router->get('/api/materials', [\App\Controllers\ContentController::class, 'listForStudent']);
 $router->delete('/api/materials', [\App\Controllers\ContentController::class, 'delete']);
+
+// Attendance Routes
+$router->post('/api/attendance/mark', [AttendanceController::class, 'mark']);
+$router->get('/api/attendance/student/{id}', [AttendanceController::class, 'getByStudent']);
+$router->get('/api/attendance/course/{id}', [AttendanceController::class, 'getByCourse']);
+$router->get('/api/attendance/report/monthly', [AttendanceController::class, 'getMonthlyReport']);
+
+// Performance Routes
+$router->post('/api/performance/generate', [PerformanceController::class, 'generate']);
+$router->get('/api/performance/student/{id}', [PerformanceController::class, 'getByStudent']);
+$router->get('/api/performance/course/{id}', [PerformanceController::class, 'getByCourse']);
+
+// Gap Analysis Routes
+$router->post('/api/gap-analysis/generate', [GapAnalysisController::class, 'generate']);
+$router->get('/api/gap-analysis/student/{id}', [GapAnalysisController::class, 'getByStudent']);
+$router->get('/api/gap-analysis/high-risk', [GapAnalysisController::class, 'getHighRisk']);
+
+// ==========================================
+// MODULE H: NOTIFICATION & HELP MODULE
+// ==========================================
+
+// Notification Routes
+$router->get('/api/notifications', [NotificationController::class, 'getNotifications']);
+$router->get('/api/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
+$router->put('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+$router->put('/api/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+// Announcement Routes
+$router->post('/api/announcements/create', [AnnouncementController::class, 'create']);
+$router->get('/api/announcements', [AnnouncementController::class, 'list']);
+$router->delete('/api/announcements/{id}', [AnnouncementController::class, 'delete']);
+
+// FAQ Routes
+$router->get('/api/help/faqs', [HelpController::class, 'getFAQs']);
+$router->post('/api/help/faqs/create', [HelpController::class, 'createFAQ']);
+$router->put('/api/help/faqs/{id}', [HelpController::class, 'updateFAQ']);
+
+// User Guide Routes
+$router->get('/api/help/guides', [HelpController::class, 'getGuides']);
+$router->post('/api/help/guides/create', [HelpController::class, 'createGuide']);
+
+// Support Ticket Routes
+$router->post('/api/support/tickets/create', [SupportTicketController::class, 'create']);
+$router->get('/api/support/tickets', [SupportTicketController::class, 'list']);
+$router->get('/api/support/tickets/{id}', [SupportTicketController::class, 'get']);
+$router->post('/api/support/tickets/{id}/reply', [SupportTicketController::class, 'reply']);
+$router->put('/api/support/tickets/{id}/status', [SupportTicketController::class, 'updateStatus']);
