@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Bell, ChevronDown } from 'lucide-react';
-import { COLORS, SHADOWS } from '../../constants/theme';
+import NotificationBell from '../common/NotificationBell';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Header = () => {
+  const { user } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifications, setNotifications] = useState(3);
+
+  const getInitials = (name) => {
+    return name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U';
+  };
 
   return (
     <motion.header
@@ -39,23 +41,8 @@ const Header = () => {
 
       {/* Right Side Icons */}
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="relative p-2 rounded-lg transition-colors hover:bg-gray-100"
-        >
-          <Bell size={20} style={{ color: COLORS.TEXT_SECONDARY }} />
-          {notifications > 0 && (
-            <motion.span
-              className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-            >
-              {notifications}
-            </motion.span>
-          )}
-        </motion.button>
+        {/* Real-time Notifications */}
+        <NotificationBell />
 
         {/* Profile Dropdown */}
         <div className="relative">
@@ -69,10 +56,10 @@ const Header = () => {
               className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
               style={{ backgroundColor: COLORS.PRIMARY_BLUE }}
             >
-              AK
+              {getInitials(user?.full_name)}
             </div>
             <span className="hidden sm:block text-sm font-medium" style={{ color: COLORS.TEXT_PRIMARY }}>
-              Alex Kumar
+              {user?.full_name || 'User'}
             </span>
             <ChevronDown size={16} style={{ color: COLORS.TEXT_SECONDARY }} />
           </motion.button>

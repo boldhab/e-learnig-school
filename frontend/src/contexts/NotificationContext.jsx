@@ -1,0 +1,118 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import Pusher from 'pusher-js';
+import toast from 'react-hot-toast';
+import { useAuth } from './AuthContext';
+import { Bell, Info, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
+
+const NotificationContext = createContext();
+
+export const NotificationProvider = ({ children }) => {
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Initialize Pusher
+    const pusher = new Pusher(import.meta.env.VITE_PUSHER_KEY, {
+      cluster: import.meta.env.VITE_PUSHER_CLUSTER,
+      forceTLS: true,
+      authEndpoint: `${import.meta.env.VITE_API_BASE_URL}/broadcasting/auth`,
+      auth: {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    });
+
+    const channel = pusher.subscribe(`private-user-${user.id}`);
+
+    channel.bind('notification.received', (data) => {
+      console.log('New notification:', data);
+      
+      // Update local state
+      setNotifications(prev => [data, ...prev]);
+      setUnreadCount(prev => prev + 1);
+
+      // Trigger Toast
+      showToast(data);
+    });
+
+    return () => {
+      pusher.unsubscribe(`private-user-${user.id}`);
+      pusher.disconnect();
+    };
+  }, [user]);
+
+  const showToast = (data) => {
+    const icons = {
+      assignment: <FileText className="text-blue-500" size={20} />,
+      grade: <Award className="text-green-500" size={20} />,
+      attendance: <AlertTriangle className="text-amber-500" size={20} />,
+      system: <Info className="text-slate-500" size={20} />,
+    };
+
+    toast.custom((t) => (
+      <div
+        className={`${
+          t.visible ? 'animate-enter' : 'animate-leave'
+        } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 border-l-4 overflow-hidden`}
+        style={{ 
+          borderColor: data.priority === 'high' ? '#EF4444' : '#3B82F6',
+          backgroundColor: '#FFFFFF'
+        }}
+      >
+        <div className="flex-1 w-0 p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              {icons[data.type] || <Bell className="text-blue-500" size={20} />}
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-bold text-slate-900">
+                {data.title}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.message}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex border-l border-gray-100">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-slate-400 hover:text-slate-600 focus:outline-none"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    ), { duration: 5000 });
+  };
+
+  return (
+    <NotificationContext.Provider value={{ notifications, unreadCount, setUnreadCount }}>
+      {children}
+    </NotificationContext.Provider>
+  );
+};
+
+export const useNotifications = () => useContext(NotificationContext);
+
+// Custom Award icon for grade toast (Lucide Award isn't in my basic list usually)
+const Award = ({ className, size }) => (
+  <svg 
+    className={className} 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="8" r="7" />
+    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+  </svg>
+);

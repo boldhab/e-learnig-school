@@ -36,23 +36,26 @@ class GapAnalysisService {
         }
         $overallScore = $totalMax > 0 ? ($totalEarned / $totalMax) * 100 : 0.0;
 
-        // Determine Risk Level
-        /*
-        HIGH RISK: Attendance < 60% OR Score < 50%
-        MEDIUM RISK: Attendance 60–75% OR Score 50–65%
-        LOW RISK: Attendance > 75% AND Score > 65%
-        */
-
-        if ($attendancePercentage < 60 || $overallScore < 50) {
+        // Determine risk level based on score AND attendance
+        $riskLevel = 'low';
+        if ($overallScore < 50 || $attendancePercentage < 40) {
             $riskLevel = 'high';
-            $recommendations = 'Immediate intervention required. Mandatory counseling and remedial classes.';
-            $weakTopics = 'Requires fundamental review across all recent topics.';
-        } elseif (($attendancePercentage >= 60 && $attendancePercentage <= 75) || ($overallScore >= 50 && $overallScore <= 65)) {
+        } elseif ($overallScore < 65 || $attendancePercentage < 60) {
             $riskLevel = 'medium';
-            $recommendations = 'Needs to improve attendance and focus on practice assignments.';
+        }
+
+        // Improvement Recommendations based on specific gaps
+        if ($riskLevel === 'high') {
+            $recommendations = $attendancePercentage < 40 
+                ? 'CRITICAL: Absenteeism is severely impacting learning. Immediate parent-teacher meeting required.'
+                : 'Immediate intervention required. Mandatory counseling and remedial classes.';
+            $weakTopics = 'Requires fundamental review across all recent topics.';
+        } elseif ($riskLevel === 'medium') {
+            $recommendations = $attendancePercentage < 60
+                ? 'Attendance needs to stabilize. Student is missing key conceptual lessons.'
+                : 'Needs to focus on practice assignments and consistent participation.';
             $weakTopics = 'Inconsistent performance in recent chapters.';
         } else {
-            $riskLevel = 'low';
             $recommendations = 'Keep up the good work. Try advanced assignments.';
             $weakTopics = 'No major weaknesses detected.';
         }

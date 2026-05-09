@@ -13,7 +13,14 @@ class NotificationService {
     }
 
     public function createNotification(array $data): int {
-        return $this->notificationRepo->create($data);
+        $id = $this->notificationRepo->create($data);
+        $data['id'] = $id;
+        
+        // Broadcast in real-time
+        $broadcastManager = new \App\Broadcasting\BroadcastManager();
+        $broadcastManager->broadcast(new \App\Events\NotificationEvent($data['user_id'], $data));
+        
+        return $id;
     }
 
     public function getUserNotifications(int $userId, int $limit = 50, int $offset = 0): array {

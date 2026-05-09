@@ -29,12 +29,17 @@ const LoginPage = () => (
   </div>
 );
 
+import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
-        <div className="App">
-          <Toaster position="top-right" />
+      <AuthProvider>
+        <NotificationProvider>
+          <Router>
+            <div className="App">
+              <Toaster position="top-right" />
           <Routes>
             <Route path="/auth/login" element={<LoginPage />} />
             <Route
@@ -66,7 +71,9 @@ function App() {
           </Routes>
         </div>
       </Router>
-    </ErrorBoundary>
+    </NotificationProvider>
+  </AuthProvider>
+</ErrorBoundary>
   );
 }
 
