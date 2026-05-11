@@ -18,10 +18,16 @@ const adminApi = {
   // Stats & Overview
   getDashboardStats: () => api.get("admin/stats"),
   getActivityLogs: () => api.get("admin/logs"),
+  getAssignmentsOverview: () => api.get("admin/assignments/overview"),
 
   // Class & Course Lists
   getClasses: () => api.get("admin/classes"),
   getCourses: () => api.get("admin/courses"),
+  getCoursesOverview: () => api.get("admin/courses/overview"),
+  getCourseDetails: (courseId, classId) =>
+    api.get(`admin/courses/${courseId}/details`, {
+      params: classId ? { class_id: classId } : {}
+    }),
 
   // System
   backupSystem: () => api.post("admin/backup"),
