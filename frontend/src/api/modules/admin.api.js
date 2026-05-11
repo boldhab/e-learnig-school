@@ -19,6 +19,8 @@ const adminApi = {
   getDashboardStats: () => api.get("admin/stats"),
   getActivityLogs: () => api.get("admin/logs"),
   getAssignmentsOverview: () => api.get("admin/assignments/overview"),
+  getDiscussionsMonitoring: () => api.get("admin/discussions/monitoring"),
+  getAttendanceReports: () => api.get("admin/attendance/reports"),
 
   // Class & Course Lists
   getClasses: () => api.get("admin/classes"),

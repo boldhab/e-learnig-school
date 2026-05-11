@@ -745,4 +745,205 @@ class AdminController extends BaseController {
             $this->error($e->getMessage());
         }
     }
+
+    public function getDiscussionsMonitoring(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            // Closed/archived discussions count
+            $flaggedStmt = $db->query("
+                SELECT COUNT(*) FROM discussion_topics 
+                WHERE status = 'closed'
+            ");
+            $flaggedCount = (int) $flaggedStmt->fetchColumn();
+
+            // Total open threads
+            $openThreadsStmt = $db->query("
+                SELECT COUNT(*) FROM discussion_topics 
+                WHERE status = 'open'
+            ");
+            $openThreads = (int) $openThreadsStmt->fetchColumn();
+
+            // Total discussion groups
+            $totalGroupsStmt = $db->query("
+                SELECT COUNT(*) FROM discussion_groups
+            ");
+            $totalGroups = (int) $totalGroupsStmt->fetchColumn();
+
+            // Engagement level based on recent message activity
+            $engagementStmt = $db->query("
+                SELECT COUNT(*) as message_count FROM discussion_messages 
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                AND deleted_at IS NULL
+            ");
+            $engagementData = $engagementStmt->fetch();
+            $engagementLevel = ($engagementData['message_count'] ?? 0) > 50 ? 'High' : (($engagementData['message_count'] ?? 0) > 20 ? 'Medium' : 'Low');
+
+            // Recent discussion topics with message counts
+            $threadsStmt = $db->query("
+                SELECT
+                    dt.id,
+                    dt.title,
+                    dg.title as group_title,
+                    u.full_name as author,
+                    dt.status,
+                    COUNT(DISTINCT dm.id) as message_count,
+                    MAX(dt.created_at) as created_at
+                FROM discussion_topics dt
+                INNER JOIN discussion_groups dg ON dg.id = dt.group_id
+                INNER JOIN users u ON u.id = dt.created_by
+                LEFT JOIN discussion_messages dm ON dm.topic_id = dt.id AND dm.deleted_at IS NULL
+                GROUP BY dt.id, dt.title, dg.title, u.full_name, dt.status
+                ORDER BY MAX(dt.created_at) DESC
+                LIMIT 8
+            ");
+            $threads = $threadsStmt->fetchAll();
+
+            $formattedThreads = array_map(function ($t) {
+                return [
+                    'id' => (int) $t['id'],
+                    'title' => $t['title'] ?? 'Unnamed Discussion',
+                    'author' => $t['author'] ?? 'Unknown',
+                    'status' => $t['status'] === 'closed' ? 'Flagged' : ($t['status'] === 'open' ? 'Clean' : 'Moderate'),
+                    'replies' => (int) $t['message_count'],
+                    'last_activity' => $t['created_at'],
+                ];
+            }, $threads);
+
+            $this->success([
+                'metrics' => [
+                    'flagged_posts' => $flaggedCount,
+                    'open_threads' => $openThreads,
+                    'moderation_queue' => $totalGroups,
+                    'engagement' => $engagementLevel,
+                ],
+                'threads' => $formattedThreads,
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getAttendanceReports(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            // Overall school attendance rate (present / total)
+            $overallStmt = $db->query("
+                SELECT 
+                    COUNT(*) as total_records,
+                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count
+                FROM attendance_records
+                WHERE attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            ");
+            $overallData = $overallStmt->fetch();
+            $totalRecords = (int) ($overallData['total_records'] ?? 0);
+            $presentCount = (int) ($overallData['present_count'] ?? 0);
+            $lateCount = (int) ($overallData['late_count'] ?? 0);
+            $schoolAttendanceRate = $totalRecords > 0 ? round(($presentCount / $totalRecords) * 100) : 0;
+
+            // Monthly attendance trend (last 6 months)
+            $monthlyStmt = $db->query("
+                SELECT
+                    DATE_FORMAT(attendance_date, '%b') as month,
+                    ROUND((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) / COUNT(*)) * 100) as rate
+                FROM attendance_records
+                WHERE attendance_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+                GROUP BY DATE_FORMAT(attendance_date, '%Y-%m')
+                ORDER BY attendance_date ASC
+            ");
+            $monthlyData = $monthlyStmt->fetchAll();
+
+            // Grade-based attendance rates
+            $gradeStmt = $db->query("
+                SELECT
+                    c.name as grade,
+                    ROUND((SUM(CASE WHEN ar.status = 'present' THEN 1 ELSE 0 END) / COUNT(ar.id)) * 100) as rate
+                FROM attendance_records ar
+                INNER JOIN users u ON u.id = ar.student_id
+                INNER JOIN categories c ON c.id = u.class_id
+                WHERE ar.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                AND c.type = 'Grade'
+                GROUP BY c.id, c.name
+                ORDER BY c.name ASC
+            ");
+            $gradeData = $gradeStmt->fetchAll();
+
+            // Subject-based attendance rates
+            $subjectStmt = $db->query("
+                SELECT
+                    c.name as subject,
+                    ROUND((SUM(CASE WHEN ar.status = 'present' THEN 1 ELSE 0 END) / COUNT(ar.id)) * 100) as rate
+                FROM attendance_records ar
+                INNER JOIN categories c ON c.id = ar.course_id
+                WHERE ar.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                AND c.type IN ('Subject', 'Course')
+                GROUP BY c.id, c.name
+                ORDER BY c.name ASC
+                LIMIT 6
+            ");
+            $subjectData = $subjectStmt->fetchAll();
+
+            // Count improving grades (grades with upward trend in last 2 weeks vs previous 2 weeks)
+            $improvingStmt = $db->query("
+                SELECT COUNT(DISTINCT c.id) as improving_count
+                FROM (
+                    SELECT 
+                        u.class_id,
+                        ROUND((SUM(CASE WHEN ar.status = 'present' THEN 1 ELSE 0 END) / COUNT(ar.id)) * 100) as rate
+                    FROM attendance_records ar
+                    INNER JOIN users u ON u.id = ar.student_id
+                    WHERE ar.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+                    GROUP BY u.class_id
+                ) recent
+                INNER JOIN (
+                    SELECT 
+                        u.class_id,
+                        ROUND((SUM(CASE WHEN ar.status = 'present' THEN 1 ELSE 0 END) / COUNT(ar.id)) * 100) as rate
+                    FROM attendance_records ar
+                    INNER JOIN users u ON u.id = ar.student_id
+                    WHERE ar.attendance_date >= DATE_SUB(CURDATE(), INTERVAL 28 DAY)
+                    AND ar.attendance_date < DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+                    GROUP BY u.class_id
+                ) previous ON recent.class_id = previous.class_id
+                INNER JOIN categories c ON c.id = recent.class_id
+                WHERE recent.rate > previous.rate
+            ");
+            $improvingData = $improvingStmt->fetch();
+            $improvingGradesCount = (int) ($improvingData['improving_count'] ?? 0);
+
+            $this->success([
+                'metrics' => [
+                    'school_attendance' => $schoolAttendanceRate,
+                    'late_arrivals' => $lateCount,
+                    'improving_grades' => $improvingGradesCount,
+                ],
+                'monthly_trend' => array_map(function ($data) {
+                    return [
+                        'month' => $data['month'],
+                        'rate' => (int) ($data['rate'] ?? 0),
+                    ];
+                }, $monthlyData),
+                'grade_attendance' => array_map(function ($data) {
+                    return [
+                        'grade' => $data['grade'],
+                        'rate' => (int) ($data['rate'] ?? 0),
+                    ];
+                }, $gradeData),
+                'subject_attendance' => array_map(function ($data) {
+                    return [
+                        'subject' => $data['subject'],
+                        'rate' => (int) ($data['rate'] ?? 0),
+                    ];
+                }, $subjectData),
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
 }

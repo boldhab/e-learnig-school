@@ -21,10 +21,12 @@ const AssignmentsOverviewPage = () => {
         setLoading(true);
         setError(null);
         const response = await adminApi.getAssignmentsOverview();
-        if (response.data) {
-          setMetrics(response.data.metrics);
-          setAssignments(response.data.assignments);
-          setTeacherActivitySummary(response.data.teacher_activity_summary);
+        const data = response.data?.data || response.data || {};
+        
+        if (data && data.metrics) {
+          setMetrics(data.metrics);
+          setAssignments(data.assignments || []);
+          setTeacherActivitySummary(data.teacher_activity_summary || []);
         }
       } catch (err) {
         setError(err.message || 'Failed to load assignments overview');

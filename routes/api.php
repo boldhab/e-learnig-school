@@ -51,6 +51,8 @@ $router->get('/api/admin/courses', [AdminController::class, 'getCourses']);
 $router->get('/api/admin/courses/overview', [AdminController::class, 'getCoursesOverview']);
 $router->get('/api/admin/courses/{id}/details', [AdminController::class, 'getCourseDetails']);
 $router->get('/api/admin/assignments/overview', [AdminController::class, 'getAssignmentsOverview']);
+$router->get('/api/admin/discussions/monitoring', [AdminController::class, 'getDiscussionsMonitoring']);
+$router->get('/api/admin/attendance/reports', [AdminController::class, 'getAttendanceReports']);
 $router->post('/api/admin/users/update', [AdminController::class, 'updateUser']);
 $router->post('/api/admin/users/delete', [AdminController::class, 'deleteUser']);
 $router->post('/api/admin/users/reset-password', [AdminController::class, 'resetPassword']);
