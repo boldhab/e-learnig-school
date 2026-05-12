@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   Upload,
   File,
@@ -11,8 +12,13 @@ import {
   CheckCircle,
   Calendar,
   BookOpen,
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
+import contentApi from '../../api/modules/content.api';
+import teacherApi from '../../api/modules/teacher.api';
+import toast from 'react-hot-toast';
 
 // File Card Component
 const FileCard = ({ file, index, onDelete }) => {
@@ -177,15 +183,70 @@ const MaterialTypeSelector = ({ selectedType, setSelectedType }) => {
 };
 
 const TeacherMaterials = () => {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedType, setSelectedType] = useState('all');
-  const [uploadedFiles, setUploadedFiles] = useState([
-    { name: 'Chapter 1 - Introduction.pdf', type: 'application/pdf', date: 'Mar 5, 2026', size: '2.4 MB' },
-    { name: 'Mathematics Formulas.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', date: 'Mar 4, 2026', size: '1.8 MB' },
-    { name: 'Class Recording - Day 1.mp4', type: 'video/mp4', date: 'Mar 3, 2026', size: '145 MB' },
-    { name: 'Quiz Template.xlsx', type: 'application/vnd.ms-excel', date: 'Mar 2, 2026', size: '512 KB' },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [assignedSections, setAssignedSections] = useState([]);
+  const [selectedSection, setSelectedSection] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const response = await teacherApi.getDashboard();
+        const data = response.data?.data ?? response.data;
+        const sections = data?.courses ?? [];
+        setAssignedSections(sections);
+        if (sections.length > 0) {
+          setSelectedSection(JSON.stringify({ 
+            course_id: sections[0].id, 
+            class_id: sections[0].class_id 
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        toast.error("Failed to load your assigned courses");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSection) {
+      const fetchMaterials = async () => {
+        setMaterialsLoading(true);
+        try {
+          const { course_id, class_id } = JSON.parse(selectedSection);
+          const response = await contentApi.getMaterials(course_id, class_id);
+          const data = response.data?.data ?? response.data ?? [];
+          
+          setUploadedFiles(data.map(m => ({
+            id: m.id,
+            name: m.title,
+            type: m.file_type || 'application/octet-stream',
+            date: new Date(m.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            }),
+            size: m.file_size ? (m.file_size / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size',
+            url: m.cloudinary_url
+          })));
+        } catch (error) {
+          console.error("Failed to fetch materials:", error);
+          toast.error("Failed to load materials for this course");
+        } finally {
+          setMaterialsLoading(false);
+        }
+      };
+      fetchMaterials();
+    }
+  }, [selectedSection]);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -218,8 +279,18 @@ const TeacherMaterials = () => {
     });
   };
 
-  const handleFileDelete = (index) => {
-    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+  const handleFileDelete = async (index) => {
+    const file = uploadedFiles[index];
+    if (!window.confirm(`Are you sure you want to delete ${file.name}?`)) return;
+
+    try {
+      await contentApi.deleteMaterial(file.id);
+      toast.success("Material deleted successfully");
+      setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error("Failed to delete material");
+    }
   };
 
   return (
@@ -240,48 +311,46 @@ const TeacherMaterials = () => {
         </div>
 
         {/* Course Selector */}
-        <div className="mb-6">
-          <label style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="block text-sm font-medium mb-2">
-            Select Course
-          </label>
-          <select
-            className="w-full px-4 py-3 rounded-lg border outline-none"
-            style={{
-              borderColor: TEACHER_COLORS.BORDER,
-              color: TEACHER_COLORS.TEXT_PRIMARY,
-            }}
+        <div className="mb-6 flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="block text-sm font-medium mb-2">
+              Select Course & Section
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border outline-none bg-white shadow-sm"
+              style={{
+                borderColor: TEACHER_COLORS.BORDER,
+                color: TEACHER_COLORS.TEXT_PRIMARY,
+              }}
+            >
+              {assignedSections.map((section, idx) => (
+                <option key={idx} value={JSON.stringify({ course_id: section.id, class_id: section.class_id })}>
+                  {section.name} - {section.class_name || section.grade_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <motion.button
+            onClick={() => navigate('/teacher/materials/upload')}
+            className="flex items-center gap-2 px-6 py-3 rounded-lg text-white font-bold shadow-lg"
+            style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <option>Mathematics 101 - Section A</option>
-            <option>Physics 102 - Section B</option>
-            <option>Chemistry 101 - Section A</option>
-            <option>Biology 103 - Section C</option>
-          </select>
+            <Plus size={20} />
+            New Upload
+          </motion.button>
         </div>
       </motion.div>
 
-      {/* Upload Area */}
-      <motion.div
-        className="mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <UploadArea onDrop={handleDrop} isDragActive={dragActive} />
-      </motion.div>
-
-      {/* Material Type Filter */}
-      <MaterialTypeSelector selectedType={selectedType} setSelectedType={setSelectedType} />
-
-      {/* Uploaded Files Section */}
+      {/* Materials Section */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <h2 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-xl font-bold">
-              Recently Uploaded
+              Materials for this Section
             </h2>
             <span
               style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}
@@ -292,11 +361,16 @@ const TeacherMaterials = () => {
           </div>
         </div>
 
-        {uploadedFiles.length > 0 ? (
+        {materialsLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
+            <p className="text-slate-500 font-medium">Fetching materials...</p>
+          </div>
+        ) : uploadedFiles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {uploadedFiles.map((file, index) => (
               <FileCard
-                key={index}
+                key={file.id || index}
                 file={file}
                 index={index}
                 onDelete={handleFileDelete}
@@ -305,7 +379,8 @@ const TeacherMaterials = () => {
           </div>
         ) : (
           <motion.div
-            className="text-center py-12"
+            className="text-center py-12 border-2 border-dashed rounded-3xl"
+            style={{ borderColor: TEACHER_COLORS.BORDER }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -314,9 +389,19 @@ const TeacherMaterials = () => {
               style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}
               className="mx-auto mb-4 opacity-50"
             />
-            <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-lg">
-              No materials uploaded yet
+            <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-lg font-semibold">
+              No materials found
             </p>
+            <p className="text-sm text-slate-400 mb-6">Start by uploading resources for your students.</p>
+            <motion.button
+              onClick={() => navigate('/teacher/materials/upload')}
+              className="px-6 py-2 rounded-lg text-white font-medium"
+              style={{ backgroundColor: TEACHER_COLORS.CREATE }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Upload First Material
+            </motion.button>
           </motion.div>
         )}
       </motion.div>

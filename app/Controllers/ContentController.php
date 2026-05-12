@@ -34,6 +34,12 @@ class ContentController {
         }
 
         $data = HtmlSanitizer::sanitize($request->getBody());
+        
+        // Handle course_id from frontend if subject_id is missing
+        if (!isset($data['subject_id']) && isset($data['course_id'])) {
+            $data['subject_id'] = $data['course_id'];
+        }
+
         $file = $_FILES['material'] ?? null;
 
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
@@ -49,9 +55,9 @@ class ContentController {
         }
 
         try {
-            $data['uploaded_by'] = $user['user_id'];
+            $data['uploaded_by'] = $user['id']; // Use 'id' instead of 'user_id' based on Auth middleware
             $id = $this->contentService->uploadMaterial($data, $file);
-            return $this->success(['material_id' => $id], 'Material uploaded successfully to Cloudinary', 201);
+            return $this->success(['material_id' => $id], 'Material uploaded successfully', 201);
         } catch (\Exception $e) {
             $this->logError($e->getMessage());
             return $this->error($e->getMessage(), 500);

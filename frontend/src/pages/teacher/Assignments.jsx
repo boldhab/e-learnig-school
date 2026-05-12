@@ -115,7 +115,7 @@ const TeacherAssignments = () => {
   const fetchAssignments = async () => {
     try {
       const res = await assignmentApi.getAssignments('');
-      setAssignments(res.data);
+      setAssignments(res.data?.data ?? res.data ?? []);
     } catch (error) {
       console.error("Failed to fetch assignments:", error);
       toast.error("Failed to load assignments");
@@ -128,9 +128,9 @@ const TeacherAssignments = () => {
     fetchAssignments();
   }, []);
 
-  const filteredAssignments = assignments.filter((assignment) =>
+  const filteredAssignments = Array.isArray(assignments) ? assignments.filter((assignment) =>
     assignment.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   if (loading) {
     return (

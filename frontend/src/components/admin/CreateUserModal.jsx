@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, UserPlus, Shield, Loader2, BookOpen, GraduationCap } from 'lucide-react';
+import { X, UserPlus, Shield, Loader2 } from 'lucide-react';
 import adminApi from '../../api/modules/admin.api';
 import toast from 'react-hot-toast';
 
 const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
   const [loading, setLoading] = useState(false);
   const [listsLoading, setListsLoading] = useState(false);
+  const [classesRefreshing, setClassesRefreshing] = useState(false);
   const [classes, setClasses] = useState([]);
   const [courses, setCourses] = useState([]);
   
@@ -22,7 +23,7 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
 
   useEffect(() => {
     if (isOpen) {
-      const fetchLists = async () => {
+      const loadLists = async () => {
         setListsLoading(true);
         try {
           const [classesRes, coursesRes] = await Promise.all([
@@ -37,9 +38,24 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
           setListsLoading(false);
         }
       };
-      fetchLists();
+
+      loadLists();
     }
   }, [isOpen]);
+
+  const refreshClasses = async () => {
+    setClassesRefreshing(true);
+    try {
+      const classesRes = await adminApi.getClasses();
+      const next = classesRes.data?.data || classesRes.data || [];
+      setClasses(Array.isArray(next) ? next : []);
+    } catch (err) {
+      console.error('Failed to refresh classes:', err);
+      toast.error('Failed to refresh classes');
+    } finally {
+      setClassesRefreshing(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -178,7 +194,17 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
                       exit={{ opacity: 0, height: 0 }}
                       className="space-y-1"
                     >
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Assign to Class</label>
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Assign to Class</label>
+                        <button
+                          type="button"
+                          onClick={refreshClasses}
+                          disabled={listsLoading || classesRefreshing}
+                          className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                        >
+                          {classesRefreshing ? 'Refreshing…' : 'Refresh'}
+                        </button>
+                      </div>
                       <select
                         required
                         className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-white"
@@ -210,7 +236,17 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
                         </select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Assigned Class</label>
+                        <div className="flex items-center justify-between gap-3">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Assigned Class</label>
+                          <button
+                            type="button"
+                            onClick={refreshClasses}
+                            disabled={listsLoading || classesRefreshing}
+                            className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                          >
+                            {classesRefreshing ? 'Refreshing…' : 'Refresh'}
+                          </button>
+                        </div>
                         <select
                           required
                           className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-white"

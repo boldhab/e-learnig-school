@@ -26,6 +26,7 @@ $router->get('/api/health', function() {
 $router->post('/api/auth/login', [AuthController::class, 'login']);
 $router->post('/api/auth/logout', [AuthController::class, 'logout']);
 $router->get('/api/auth/me', [AuthController::class, 'me']);
+$router->post('/api/auth/register', [AuthController::class, 'register']);
 
 // Admin Routes
 $router->post('/api/admin/students', [AdminController::class, 'createStudent']);
@@ -48,13 +49,28 @@ $router->get('/api/admin/stats', [AdminController::class, 'getStats']);
 $router->get('/api/admin/logs', [AdminController::class, 'getLogs']);
 $router->get('/api/admin/logs/detailed', [AdminController::class, 'getDetailedLogs']);
 $router->get('/api/admin/classes', [AdminController::class, 'getClasses']);
+$router->post('/api/admin/classes', [AdminController::class, 'createClass']);
+$router->put('/api/admin/classes/{id}', [AdminController::class, 'updateClass']);
+$router->delete('/api/admin/classes/{id}', [AdminController::class, 'deleteClass']);
+$router->post('/api/admin/classes/{classId}/remove-student', [AdminController::class, 'removeStudentFromClass']);
+$router->get('/api/admin/classes/{classId}/available-students', [AdminController::class, 'getAvailableStudentsForClass']);
 $router->get('/api/admin/courses', [AdminController::class, 'getCourses']);
 $router->get('/api/admin/courses/overview', [AdminController::class, 'getCoursesOverview']);
 $router->get('/api/admin/courses/{id}/details', [AdminController::class, 'getCourseDetails']);
+$router->delete('/api/admin/courses/{id}', [AdminController::class, 'deleteCourse']);
+$router->get('/api/admin/classes/{classId}', [AdminController::class, 'getClassDetails']);
 $router->get('/api/admin/assignments/overview', [AdminController::class, 'getAssignmentsOverview']);
 $router->get('/api/admin/discussions/monitoring', [AdminController::class, 'getDiscussionsMonitoring']);
 $router->get('/api/admin/attendance/reports', [AdminController::class, 'getAttendanceReports']);
 $router->get('/api/admin/performance/analytics', [AdminController::class, 'getPerformanceAnalytics']);
+$router->get('/api/admin/academic/departments', [AdminController::class, 'getAcademicDepartments']);
+$router->post('/api/admin/academic/departments', [AdminController::class, 'createDepartment']);
+$router->post('/api/admin/academic/departments/{id}/teachers', [AdminController::class, 'assignTeacherToDepartment']);
+$router->post('/api/admin/academic/departments/{id}/classes', [AdminController::class, 'createDepartmentClass']);
+$router->post('/api/admin/academic/classes/{id}/courses', [AdminController::class, 'assignCourseToClass']);
+$router->post('/api/admin/academic/classes', [AdminController::class, 'createStandaloneClass']);
+$router->post('/api/admin/academic/courses', [AdminController::class, 'createCourse']);
+$router->get('/api/admin/academic/courses/{id}/teachers', [AdminController::class, 'getCourseTeachers']);
 $router->post('/api/admin/users/update', [AdminController::class, 'updateUser']);
 $router->post('/api/admin/users/delete', [AdminController::class, 'deleteUser']);
 $router->post('/api/admin/users/reset-password', [AdminController::class, 'resetPassword']);
@@ -65,6 +81,7 @@ $router->post('/api/categories', [\App\Controllers\CategoryController::class, 'c
 $router->get('/api/categories', [\App\Controllers\CategoryController::class, 'list']);
 $router->get('/api/courses', [\App\Controllers\CourseController::class, 'list']);
 $router->get('/api/courses/{id}/students', [\App\Controllers\CourseController::class, 'students']);
+$router->get('/api/teacher/dashboard', [\App\Controllers\CourseController::class, 'dashboard']);
 
 // Assignment Routes
 $router->post('/api/assignments/create', [\App\Controllers\AssignmentController::class, 'create']);

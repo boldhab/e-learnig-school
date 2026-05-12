@@ -1,375 +1,437 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { BookOpen, ChevronDown, ChevronUp, Plus, Users, UserCheck, Layers3, Sparkles, Loader2, CalendarClock, FileText, MessageSquareText, Megaphone, ClipboardCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BookOpen, GraduationCap, Loader2, Plus, Trash2, Users, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import adminApi from '../../api/modules/admin.api';
 import { AdminBadge, AdminCard, AdminMetricCard, AdminSection } from '../../components/admin/AdminUI';
 
 const ManageCoursesPage = () => {
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState('');
-	const [hierarchy, setHierarchy] = useState([]);
-	const [summary, setSummary] = useState({
-		total_courses: 0,
-		total_subjects: 0,
-		total_grades: 0,
-		assigned_teachers: 0,
-		active_sections: 0,
-		auto_groups: 0,
-	});
-	const [levels, setLevels] = useState([]);
-	const [unassignedCourses, setUnassignedCourses] = useState([]);
-	const [expanded, setExpanded] = useState('');
-	const [selectedCourse, setSelectedCourse] = useState(null);
-	const [detailsLoading, setDetailsLoading] = useState(false);
-	const [detailsError, setDetailsError] = useState('');
-	const [courseDetails, setCourseDetails] = useState(null);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingClassId, setDeletingClassId] = useState(null);
+  const [deletingCourseId, setDeletingCourseId] = useState(null);
 
-	const fetchOverview = async () => {
-		setLoading(true);
-		setError('');
+  const [allTeachers, setAllTeachers] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
+  const [allClasses, setAllClasses] = useState([]);
 
-		try {
-			const res = await adminApi.getCoursesOverview();
-			const data = res.data?.data || res.data || {};
+  // Section 1 – Create Class
+  const [newClassName, setNewClassName] = useState('');
 
-			setHierarchy(data.hierarchy || []);
-			setSummary((prev) => ({ ...prev, ...(data.summary || {}) }));
-			setLevels(data.levels || []);
-			setUnassignedCourses(data.unassigned_courses || []);
+  // Section 2 – Create Course
+  const [newCourseName, setNewCourseName] = useState('');
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState([]);
 
-			if ((data.levels || []).length > 0) {
-				setExpanded(data.levels[0].name);
-			}
-		} catch (err) {
-			console.error('Failed to fetch course overview:', err);
-			setError('Failed to load course and subject data from the database.');
-		} finally {
-			setLoading(false);
-		}
-	};
+  // Section 3 – Assign Course to Class
+  const [assignClassId, setAssignClassId] = useState('');
+  const [assignCourseId, setAssignCourseId] = useState('');
+  const [assignTeacherId, setAssignTeacherId] = useState('');
 
-	useEffect(() => {
-		fetchOverview();
-	}, []);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.getAcademicDepartments();
+      const data = res?.data?.data || res?.data || {};
+      setAllTeachers(Array.isArray(data.all_teachers) ? data.all_teachers : []);
+      setAllCourses(Array.isArray(data.all_courses) ? data.all_courses : []);
+      setAllClasses(Array.isArray(data.all_classes) ? data.all_classes : []);
+    } catch (err) {
+      console.error('Failed to load academic data', err);
+      toast.error('Failed to load academic data.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	const handleCourseSelect = async (course) => {
-		setSelectedCourse(course);
-		setDetailsLoading(true);
-		setDetailsError('');
-		setCourseDetails(null);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-		try {
-			const res = await adminApi.getCourseDetails(course.course_id, course.class_id);
-			const data = res.data?.data || res.data || null;
-			setCourseDetails(data);
-		} catch (err) {
-			console.error('Failed to fetch course details:', err);
-			setDetailsError('Failed to load subject/course details for the selected card.');
-		} finally {
-			setDetailsLoading(false);
-		}
-	};
+  // When selected course changes in Section 3, reset teacher selection
+  useEffect(() => {
+    setAssignTeacherId('');
+  }, [assignCourseId]);
 
-	const closeCourseDetails = () => {
-		setSelectedCourse(null);
-		setCourseDetails(null);
-		setDetailsError('');
-		setDetailsLoading(false);
-	};
+  const selectedCourseTeachers = useMemo(() => {
+    if (!assignCourseId) return [];
+    const course = allCourses.find((c) => String(c.id) === String(assignCourseId));
+    return course?.teachers || [];
+  }, [assignCourseId, allCourses]);
 
-	const hasNoAssignedCourses = useMemo(() => {
-		return levels.every((level) => (level.courses || []).length === 0);
-	}, [levels]);
+  const summary = useMemo(() => {
+    const totalAssigned = allClasses.reduce((acc, cls) => acc + (cls.assigned_courses?.length || 0), 0);
+    return { classes: allClasses.length, courses: allCourses.length, assignments: totalAssigned };
+  }, [allClasses, allCourses]);
 
-	const selectedCardKey = selectedCourse ? `${selectedCourse.course_id}-${selectedCourse.class_id || selectedCourse.section}` : '';
+  // --- Handlers ---
 
-	if (loading) {
-		return (
-			<div className="h-64 flex items-center justify-center">
-				<Loader2 className="animate-spin text-blue-600" size={48} />
-			</div>
-		);
-	}
+  const handleCreateClass = async () => {
+    const name = newClassName.trim();
+    if (!name) { toast.error('Class name is required.'); return; }
+    setSaving(true);
+    try {
+      await adminApi.createStandaloneClass({ name });
+      setNewClassName('');
+      toast.success('Class created.');
+      await loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to create class.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-	return (
-		<div className="space-y-6">
-			<AdminSection
-				title="Course & Subject Management"
-				description="Manage grades, subjects, sections, teachers, and class analytics from a single academic hierarchy."
-				action={
-					<button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-sm">
-						<Plus size={16} />
-						Create Course
-					</button>
-				}
-			>
-				<div className="grid gap-4 md:grid-cols-3">
-					{hierarchy.map((item) => (
-						<AdminCard key={item.title} className="p-5">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm text-slate-500">Academic layer</p>
-									<h3 className="mt-1 text-xl font-semibold text-slate-900">{item.title}</h3>
-								</div>
-								<div className="rounded-2xl bg-blue-50 p-3 text-blue-700"><Layers3 size={18} /></div>
-							</div>
-							<p className="mt-3 text-sm text-slate-500">{item.detail}</p>
-							<p className="mt-4 text-sm font-semibold text-slate-900">{item.count} configured units</p>
-						</AdminCard>
-					))}
-				</div>
+  const toggleTeacher = (id) => {
+    setSelectedTeacherIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    );
+  };
 
-				<div className="grid gap-4 md:grid-cols-4">
-					<AdminMetricCard title="Total Courses" value={summary.total_courses} trend={`${summary.total_subjects} subjects`} icon={BookOpen} />
-					<AdminMetricCard title="Assigned Teachers" value={summary.assigned_teachers} trend="Live from assignments" icon={UserCheck} />
-					<AdminMetricCard title="Active Sections" value={summary.active_sections} trend={`${summary.total_grades} grades`} icon={Users} />
-					<AdminMetricCard title="Auto Groups" value={summary.auto_groups} trend="Discussion groups" icon={Sparkles} />
-				</div>
+  const handleCreateCourse = async () => {
+    const name = newCourseName.trim();
+    if (!name) { toast.error('Course name is required.'); return; }
+    setSaving(true);
+    try {
+      await adminApi.createCourse({ name, teacher_ids: selectedTeacherIds });
+      setNewCourseName('');
+      setSelectedTeacherIds([]);
+      toast.success('Course created.');
+      await loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to create course.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-				{error && (
-					<AdminCard className="p-4 border border-red-200 bg-red-50 text-red-700 text-sm">
-						{error}
-					</AdminCard>
-				)}
+  const handleAssignCourse = async () => {
+    if (!assignClassId) { toast.error('Select a class.'); return; }
+    if (!assignCourseId) { toast.error('Select a course.'); return; }
+    if (!assignTeacherId) { toast.error('Select a teacher.'); return; }
+    setSaving(true);
+    try {
+      await adminApi.assignCourseToClass(assignClassId, {
+        course_id: Number(assignCourseId),
+        teacher_id: Number(assignTeacherId),
+      });
+      setAssignClassId('');
+      setAssignCourseId('');
+      setAssignTeacherId('');
+      toast.success('Course assigned to class.');
+      await loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to assign course.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-				<AdminCard className="p-5">
-					<div className="space-y-3">
-						{levels.map((level) => (
-							<div key={level.id} className="rounded-2xl border border-slate-200">
-								<button
-									type="button"
-									onClick={() => setExpanded(level.name)}
-									className="flex w-full items-center justify-between px-5 py-4 text-left"
-								>
-									<div>
-										<p className="text-sm font-semibold text-slate-900">{level.name}</p>
-										<p className="text-sm text-slate-500">Sections, teacher assignment, and discussion groups</p>
-									</div>
-									{expanded === level.name ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
-								</button>
-								{expanded === level.name && (
-									<div className="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-2">
-										{(level.courses || []).length === 0 && (
-											<div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 lg:col-span-2">
-												No assigned courses/subjects in this grade yet.
-											</div>
-										)}
-										{(level.courses || []).map((course) => {
-											const cardKey = `${course.course_id}-${course.class_id || course.section}`;
-											const isSelected = selectedCardKey === cardKey;
+  const handleDeleteClass = async (cls) => {
+    if (!cls?.id) return;
+    const ok = window.confirm(`Delete class "${cls.name}"? This will unassign students and remove teacher/course links.`);
+    if (!ok) return;
 
-											return (
-											<motion.div
-												key={course.assignment_id || cardKey}
-												className={`rounded-2xl border p-4 cursor-pointer transition-colors ${isSelected ? 'border-blue-300 bg-blue-50/40' : 'border-slate-200 bg-white hover:border-blue-200'}`}
-												whileHover={{ y: -2 }}
-												onClick={() => handleCourseSelect(course)}
-											>
-												<div className="flex items-start justify-between gap-3">
-													<div>
-														<p className="text-xs uppercase tracking-[0.18em] text-slate-500">{course.code}</p>
-														<h4 className="mt-1 text-lg font-semibold text-slate-900">{course.title}</h4>
-														<p className="mt-1 text-sm text-slate-500">{course.section}</p>
-													</div>
-													<AdminBadge tone={course.type === 'Subject' ? 'teal' : 'blue'}>{course.type}</AdminBadge>
-												</div>
-												<div className="mt-4 grid gap-2 text-sm text-slate-600">
-													<div className="flex items-center justify-between"><span>Teacher</span><span className="font-medium text-slate-900">{course.teacher}</span></div>
-													<div className="flex items-center justify-between"><span>Students</span><span className="font-medium text-slate-900">{course.students}</span></div>
-												</div>
-												<div className="mt-4 flex gap-2">
-													<button type="button" onClick={(event) => event.stopPropagation()} className="rounded-full bg-blue-700 px-3 py-2 text-xs font-semibold text-white">Assign Teacher</button>
-													<button
-														type="button"
-														onClick={(event) => {
-															event.stopPropagation();
-															handleCourseSelect(course);
-														}}
-														className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-													>
-														Manage Section
-													</button>
-												</div>
-											</motion.div>
-											);
-										})}
+    setDeletingClassId(cls.id);
+    try {
+      await adminApi.deleteClass(cls.id);
+      toast.success('Class deleted.');
+      await loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to delete class.');
+    } finally {
+      setDeletingClassId(null);
+    }
+  };
 
-										{selectedCourse && selectedCourse.class_id === level.id && (
-											<div className="rounded-2xl border border-blue-200 bg-white p-5 lg:col-span-2">
-												<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-													<div>
-														<p className="text-xs uppercase tracking-[0.18em] text-blue-700">Course Detail</p>
-														<h4 className="text-lg font-semibold text-slate-900">{selectedCourse.title} - {selectedCourse.section}</h4>
-													</div>
-													<div className="flex items-center gap-2">
-														<AdminBadge tone={selectedCourse.type === 'Subject' ? 'teal' : 'blue'}>
-															{selectedCourse.type}
-														</AdminBadge>
-														<button
-															type="button"
-															onClick={closeCourseDetails}
-															className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-														>
-															Close
-														</button>
-													</div>
-												</div>
+  const handleDeleteCourse = async (course) => {
+    if (!course?.id) return;
+    const ok = window.confirm(`Delete course "${course.name}"? This will remove teacher assignments and course-to-class links.`);
+    if (!ok) return;
 
-												{detailsLoading && (
-													<div className="mt-4 flex items-center gap-2 text-sm text-slate-600">
-														<Loader2 size={16} className="animate-spin" />
-														Loading teacher activity and related subject analytics...
-													</div>
-												)}
+    setDeletingCourseId(course.id);
+    try {
+      await adminApi.deleteCourse(course.id);
+      toast.success('Course deleted.');
+      await loadData();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to delete course.');
+    } finally {
+      setDeletingCourseId(null);
+    }
+  };
 
-												{detailsError && (
-													<div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-														{detailsError}
-													</div>
-												)}
+  if (loading) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={44} />
+      </div>
+    );
+  }
 
-												{!detailsLoading && !detailsError && courseDetails && (
-													<div className="mt-4 space-y-4">
-														<div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-															<div className="rounded-xl border border-slate-200 p-3">
-																<p className="text-xs text-slate-500">Assignments</p>
-																<p className="mt-1 text-lg font-semibold text-slate-900">{courseDetails.stats?.assignments || 0}</p>
-															</div>
-															<div className="rounded-xl border border-slate-200 p-3">
-																<p className="text-xs text-slate-500">Materials</p>
-																<p className="mt-1 text-lg font-semibold text-slate-900">{courseDetails.stats?.materials || 0}</p>
-															</div>
-															<div className="rounded-xl border border-slate-200 p-3">
-																<p className="text-xs text-slate-500">Announcements</p>
-																<p className="mt-1 text-lg font-semibold text-slate-900">{courseDetails.stats?.announcements || 0}</p>
-															</div>
-															<div className="rounded-xl border border-slate-200 p-3">
-																<p className="text-xs text-slate-500">Discussion Topics</p>
-																<p className="mt-1 text-lg font-semibold text-slate-900">{courseDetails.stats?.discussion_topics || 0}</p>
-															</div>
-															<div className="rounded-xl border border-slate-200 p-3">
-																<p className="text-xs text-slate-500">Attendance Records</p>
-																<p className="mt-1 text-lg font-semibold text-slate-900">{courseDetails.stats?.attendance_total_records || 0}</p>
-															</div>
-														</div>
+  return (
+    <div className="space-y-8">
+      <AdminSection
+        title="Academic Management"
+        description="Create classes, build courses with teacher lists, then assign courses to classes."
+      >
+        {/* Summary */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <AdminMetricCard title="Classes" value={summary.classes} trend="Total classes" icon={GraduationCap} />
+          <AdminMetricCard title="Courses" value={summary.courses} trend="Total courses" icon={BookOpen} />
+          <AdminMetricCard title="Assignments" value={summary.assignments} trend="Course-class links" icon={Users} />
+        </div>
 
-														<div className="grid gap-4 lg:grid-cols-2">
-															<div className="rounded-xl border border-slate-200 p-4">
-																<p className="text-sm font-semibold text-slate-900">Teacher Assignments</p>
-																<div className="mt-3 space-y-2 text-sm text-slate-600">
-																	{(courseDetails.teacher_assignments || []).length === 0 && <p>No teacher assignment found for this selection.</p>}
-																	{(courseDetails.teacher_assignments || []).map((assignment) => (
-																		<div key={assignment.assignment_id} className="rounded-lg bg-slate-50 px-3 py-2">
-																			<p className="font-medium text-slate-900">{assignment.teacher_name}</p>
-																			<p className="text-xs text-slate-500">Section: {assignment.class_name} | Students: {assignment.students_in_class}</p>
-																		</div>
-																	))}
-																</div>
-															</div>
+        {/* ── Step 1: Create Class ── */}
+        <AdminCard className="p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-blue-700 font-semibold">Step 1</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">Create a Class</h3>
+          <p className="mt-1 text-sm text-slate-500">Add a class that students belong to (e.g. Grade 10-A, Class 2024).</p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={newClassName}
+              onChange={(e) => setNewClassName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateClass()}
+              placeholder="e.g. Grade 10-A"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+            />
+            <button
+              type="button"
+              onClick={handleCreateClass}
+              disabled={saving}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              <Plus size={16} />
+              Create Class
+            </button>
+          </div>
 
-															<div className="rounded-xl border border-slate-200 p-4">
-																<p className="text-sm font-semibold text-slate-900">Teacher Activity Summary</p>
-																<div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-																	<div className="rounded-lg bg-blue-50 p-2">
-																		<FileText size={14} className="mx-auto text-blue-700" />
-																		<p className="mt-1 font-semibold text-slate-900">{courseDetails.teacher_activity?.assignments_created || 0}</p>
-																		<p className="text-slate-500">Assignments</p>
-																	</div>
-																	<div className="rounded-lg bg-teal-50 p-2">
-																		<ClipboardCheck size={14} className="mx-auto text-teal-700" />
-																		<p className="mt-1 font-semibold text-slate-900">{courseDetails.teacher_activity?.attendance_marked || 0}</p>
-																		<p className="text-slate-500">Attendance</p>
-																	</div>
-																	<div className="rounded-lg bg-amber-50 p-2">
-																		<BookOpen size={14} className="mx-auto text-amber-700" />
-																		<p className="mt-1 font-semibold text-slate-900">{courseDetails.teacher_activity?.materials_uploaded || 0}</p>
-																		<p className="text-slate-500">Materials</p>
-																	</div>
-																</div>
-																<div className="mt-3 space-y-2">
-																	<p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Recent Teacher Actions</p>
-																	{(courseDetails.teacher_activity?.recent_actions || []).length === 0 && (
-																		<p className="text-sm text-slate-500">No recent teacher activity logged for this course/subject yet.</p>
-																	)}
-																	{(courseDetails.teacher_activity?.recent_actions || []).map((action, index) => (
-																		<div key={`${action.action_time}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-start gap-2">
-																			<CalendarClock size={14} className="mt-0.5 text-slate-500" />
-																			<div>
-																				<p>{action.action_label}</p>
-																				<p className="text-xs text-slate-500 mt-0.5">{new Date(action.action_time).toLocaleString()}</p>
-																			</div>
-																		</div>
-																	))}
-																</div>
-															</div>
-														</div>
+          {allClasses.length > 0 && (
+            <div className="mt-5">
+              <p className="mb-3 text-sm font-semibold text-slate-700">All Classes ({allClasses.length})</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {allClasses.map((cls) => (
+                  <div key={cls.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/admin/courses/classes/${cls.id}`)}>
+                        <p className="truncate text-sm font-semibold text-slate-900">{cls.name}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                          {cls.assigned_courses?.length || 0} course{cls.assigned_courses?.length !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClass(cls)}
+                          disabled={saving || deletingClassId === cls.id}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                          title="Delete class"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {(cls.assigned_courses || []).length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {cls.assigned_courses.map((ac) => (
+                          <div key={ac.id} className="flex items-center justify-between text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><BookOpen size={11} />{ac.course_name}</span>
+                            <span className="flex items-center gap-1"><Users size={11} />{ac.teacher_name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </AdminCard>
 
-														<div className="grid gap-4 lg:grid-cols-3">
-															<div className="rounded-xl border border-slate-200 p-4">
-																<p className="text-sm font-semibold text-slate-900 flex items-center gap-2"><BookOpen size={16} /> Latest Materials</p>
-																<div className="mt-2 space-y-2 text-sm text-slate-600">
-																	{(courseDetails.recent_materials || []).length === 0 && <p>No material uploaded yet.</p>}
-																	{(courseDetails.recent_materials || []).map((material, idx) => (
-																		<div key={`${material.title}-${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">
-																			<p className="font-medium text-slate-800">{material.title}</p>
-																			<p className="text-xs text-slate-500">By {material.uploaded_by}</p>
-																		</div>
-																	))}
-																</div>
-															</div>
+        {/* ── Step 2: Create Course ── */}
+        <AdminCard className="p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-blue-700 font-semibold">Step 2</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">Create a Course</h3>
+          <p className="mt-1 text-sm text-slate-500">Name the course and select which teachers can teach it.</p>
 
-															<div className="rounded-xl border border-slate-200 p-4">
-																<p className="text-sm font-semibold text-slate-900 flex items-center gap-2"><FileText size={16} /> Latest Assignments</p>
-																<div className="mt-2 space-y-2 text-sm text-slate-600">
-																	{(courseDetails.recent_assignments || []).length === 0 && <p>No assignments created yet.</p>}
-																	{(courseDetails.recent_assignments || []).map((assignment) => (
-																		<div key={assignment.id} className="rounded-lg bg-slate-50 px-3 py-2">
-																			<p className="font-medium text-slate-800">{assignment.title}</p>
-																			<p className="text-xs text-slate-500">By {assignment.created_by}</p>
-																		</div>
-																	))}
-																</div>
-															</div>
+          <div className="mt-4 space-y-4">
+            <input
+              type="text"
+              value={newCourseName}
+              onChange={(e) => setNewCourseName(e.target.value)}
+              placeholder="e.g. Mathematics, Biology, History"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+            />
 
-															<div className="rounded-xl border border-slate-200 p-4">
-																<p className="text-sm font-semibold text-slate-900">Engagement Snapshot</p>
-																<div className="mt-3 space-y-2 text-sm text-slate-600">
-																	<div className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><MessageSquareText size={14} /> Discussion Messages</span><span className="font-semibold text-slate-900">{courseDetails.stats?.discussion_messages || 0}</span></div>
-																	<div className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><Megaphone size={14} /> Announcements</span><span className="font-semibold text-slate-900">{courseDetails.stats?.announcements || 0}</span></div>
-																	<div className="flex items-center justify-between"><span>Present Records</span><span className="font-semibold text-slate-900">{courseDetails.stats?.attendance_present_records || 0}</span></div>
-																	<div className="flex items-center justify-between"><span>Absent Records</span><span className="font-semibold text-slate-900">{courseDetails.stats?.attendance_absent_records || 0}</span></div>
-																	<div className="flex items-center justify-between"><span>Late Records</span><span className="font-semibold text-slate-900">{courseDetails.stats?.attendance_late_records || 0}</span></div>
-																</div>
-															</div>
-														</div>
-													</div>
-												)}
-											</div>
-										)}
-									</div>
-								)}
-							</div>
-						))}
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-800">Select Teachers for This Course</p>
+              {allTeachers.length === 0 ? (
+                <p className="text-sm text-slate-400">No teachers available.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {allTeachers.map((teacher) => {
+                    const selected = selectedTeacherIds.includes(teacher.id);
+                    return (
+                      <button
+                        key={teacher.id}
+                        type="button"
+                        onClick={() => toggleTeacher(teacher.id)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          selected
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-slate-300 bg-white text-slate-700 hover:border-blue-400'
+                        }`}
+                      >
+                        {selected && <X size={11} />}
+                        {teacher.full_name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedTeacherIds.length > 0 && (
+                <p className="mt-2 text-xs text-slate-500">{selectedTeacherIds.length} teacher{selectedTeacherIds.length !== 1 ? 's' : ''} selected</p>
+              )}
+            </div>
 
-						{hasNoAssignedCourses && unassignedCourses.length > 0 && (
-							<div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-								<p className="text-sm font-semibold text-amber-900">Unassigned Courses & Subjects</p>
-								<p className="mt-1 text-sm text-amber-800">These records exist in the database but are not yet linked to a teacher/class assignment.</p>
-								<div className="mt-3 flex flex-wrap gap-2">
-									{unassignedCourses.map((course) => (
-										<AdminBadge key={course.course_id} tone="amber">
-											{course.title} ({course.type})
-										</AdminBadge>
-									))}
-								</div>
-							</div>
-						)}
-					</div>
-				</AdminCard>
-			</AdminSection>
-		</div>
-	);
+            <button
+              type="button"
+              onClick={handleCreateCourse}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              <Plus size={16} />
+              Create Course
+            </button>
+          </div>
+
+          {allCourses.length > 0 && (
+            <div className="mt-6">
+              <p className="mb-3 text-sm font-semibold text-slate-700">All Courses ({allCourses.length})</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {allCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/admin/courses/${course.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/admin/courses/${course.id}`)}
+                    className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-400 hover:bg-blue-50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <BookOpen size={15} className="shrink-0 text-blue-600" />
+                        <p className="truncate text-sm font-semibold text-slate-900">{course.name}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCourse(course);
+                        }}
+                        disabled={saving || deletingCourseId === course.id}
+                        className="inline-flex shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                        title="Delete course"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(course.teachers || []).length === 0 ? (
+                        <span className="text-xs text-slate-400">No teachers assigned</span>
+                      ) : (
+                        course.teachers.map((t) => (
+                          <AdminBadge key={t.id} tone="blue">{t.full_name}</AdminBadge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </AdminCard>
+
+        {/* ── Step 3: Assign Course to Class ── */}
+        <AdminCard className="p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-blue-700 font-semibold">Step 3</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">Assign Course to Class</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Choose a class, pick a course, then select the teacher from that course&apos;s teacher list.
+          </p>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-800">Class</label>
+              <select
+                value={assignClassId}
+                onChange={(e) => setAssignClassId(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="">Select class...</option>
+                {allClasses.map((cls) => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-800">Course</label>
+              <select
+                value={assignCourseId}
+                onChange={(e) => setAssignCourseId(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+              >
+                <option value="">Select course...</option>
+                {allCourses.map((course) => (
+                  <option key={course.id} value={course.id}>{course.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-800">
+                Teacher
+                {assignCourseId && selectedCourseTeachers.length === 0 && (
+                  <span className="ml-2 text-xs font-normal text-amber-600">No teachers on this course</span>
+                )}
+              </label>
+              <select
+                value={assignTeacherId}
+                onChange={(e) => setAssignTeacherId(e.target.value)}
+                disabled={selectedCourseTeachers.length === 0}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                <option value="">
+                  {assignCourseId
+                    ? selectedCourseTeachers.length === 0
+                      ? 'No teachers available'
+                      : 'Select teacher...'
+                    : 'Select a course first'}
+                </option>
+                {selectedCourseTeachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleAssignCourse}
+              disabled={saving || !assignClassId || !assignCourseId || !assignTeacherId}
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Assign Course to Class
+            </button>
+          </div>
+        </AdminCard>
+      </AdminSection>
+    </div>
+  );
 };
 
 export default ManageCoursesPage;
-

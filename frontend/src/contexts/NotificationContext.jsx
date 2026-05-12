@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import { Bell, Info, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
+import notificationApi from '../api/modules/notification.api';
 
 const NotificationContext = createContext();
 
@@ -13,9 +14,35 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
+  // Load current notifications snapshot so the list isn't empty
+  const loadInitial = async () => {
+    try {
+      const [nRes, cRes] = await Promise.all([
+        notificationApi.getNotifications(),
+        notificationApi.getUnreadCount(),
+      ]);
+      const list = nRes?.data?.data ?? nRes?.data ?? [];
+      setNotifications(Array.isArray(list) ? list : []);
+      const count = cRes?.data?.data ?? cRes?.data;
+      setUnreadCount(Number(count) || 0);
+    } catch (err) {
+      // ignore – SSE will still stream new notifications
+    }
+  };
+  loadInitial();
+
     // Use Server-Sent Events (SSE) instead of Pusher
     const token = localStorage.getItem('token');
-    const sseUrl = `${import.meta.env.VITE_API_BASE_URL}/notifications/stream?token=${token}`;
+  if (!token) return;
+
+  const envBaseRaw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const envBase = String(envBaseRaw).replace(/\/+$/, '');
+  const base = envBase.endsWith('/api') ? envBase : `${envBase}/api`;
+  const sseUrl = `${base}/notifications/stream?token=${encodeURIComponent(token)}`;
+  if (import.meta.env.DEV) {
+    // Helpful for diagnosing the common "text/html" SSE error (usually wrong base URL)
+    console.debug('[SSE] Connecting to:', sseUrl);
+  }
     
     const eventSource = new EventSource(sseUrl);
 

@@ -23,12 +23,27 @@ class AdminService {
         return $this->userRepository->assignToClass($studentId, $classId);
     }
 
-    public function assignTeacherToCourse($teacherId, $courseId, $classId) {
+    public function assignTeacherToCourse($teacherId, $courseId, $classIds) {
         $user = $this->userRepository->findById($teacherId);
         if (!$user || $user['role_name'] !== 'TEACHER') {
             throw new Exception("Invalid teacher ID.");
         }
-        return $this->teacherAssignmentRepo->assign($teacherId, $courseId, $classId);
+
+        $normalizedClassIds = is_array($classIds) ? $classIds : [$classIds];
+        $normalizedClassIds = array_values(array_unique(array_filter(array_map('intval', $normalizedClassIds), function ($classId) {
+            return $classId > 0;
+        })));
+
+        if (empty($normalizedClassIds)) {
+            throw new Exception('At least one class ID is required.');
+        }
+
+        $results = [];
+        foreach ($normalizedClassIds as $classId) {
+            $results[] = $this->teacherAssignmentRepo->assign($teacherId, $courseId, $classId);
+        }
+
+        return $results;
     }
 
     public function getTeacherAssignments($teacherId) {

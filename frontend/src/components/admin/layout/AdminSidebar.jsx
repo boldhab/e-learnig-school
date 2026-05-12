@@ -30,7 +30,7 @@ const sections = [
     title: 'Management',
     items: [
       { icon: Users, label: 'User Management', path: '../admin/users' },
-      { icon: BookOpen, label: 'Courses & Subjects', path: '../admin/courses' },
+      { icon: BookOpen, label: 'Academic Management', path: '../admin/courses' },
       { icon: ClipboardList, label: 'Assignments Overview', path: '../admin/assignments' },
     ],
   },

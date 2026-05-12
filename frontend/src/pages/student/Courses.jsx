@@ -124,7 +124,8 @@ const CoursesPage = () => {
     const fetchCourses = async () => {
       try {
         const response = await contentApi.getCourses();
-        setCourses(response.data.data);
+        const data = response.data?.data ?? response.data ?? [];
+        setCourses(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Failed to fetch courses:", error);
       } finally {
@@ -139,7 +140,8 @@ const CoursesPage = () => {
     setMaterialsLoading(true);
     try {
       const response = await contentApi.getMaterials(course.id);
-      setMaterials(response.data.data);
+      const data = response.data?.data ?? response.data ?? [];
+      setMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch materials:", error);
     } finally {
@@ -168,11 +170,11 @@ const CoursesPage = () => {
             <header className="mb-8">
               <h1 className="text-3xl font-bold mb-2 text-slate-900">My Courses</h1>
               <p className="text-slate-500">
-                You are enrolled in {courses.length} academic courses.
+                You are enrolled in {Array.isArray(courses) ? courses.length : 0} academic courses.
               </p>
             </header>
 
-            {courses.length === 0 ? (
+            {!Array.isArray(courses) || courses.length === 0 ? (
               <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <BookOpen size={40} className="text-slate-300" />

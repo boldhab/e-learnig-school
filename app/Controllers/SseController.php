@@ -13,34 +13,43 @@ class SseController {
 
     public function __construct() {
         $this->auth = new AuthMiddleware();
-        $this->db = Database::getInstance();
+        $this->db = null;
     }
 
     /**
      * Stream notifications to the client using Server-Sent Events.
      */
     public function stream(Request $request, Response $response) {
+        // SSE Headers (set early so client doesn't see text/html on errors)
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        header('Connection: keep-alive');
+        header('X-Accel-Buffering: no');
+
         // AuthMiddleware now handles token in query string (?token=...)
         try {
             $this->auth->handle($request, $response);
         } catch (\Exception $e) {
             header('HTTP/1.1 401 Unauthorized');
-            echo "auth failed";
+            $this->sendEvent('sse.error', ['message' => 'Unauthorized']);
             exit;
         }
         
         $user = $GLOBALS['auth_user'] ?? null;
         if (!$user) {
             header('HTTP/1.1 401 Unauthorized');
-            echo "user not found";
+            $this->sendEvent('sse.error', ['message' => 'Unauthorized']);
             exit;
         }
 
-        // SSE Headers
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
-        header('Connection: keep-alive');
-        header('X-Accel-Buffering: no'); // Disable buffering for Nginx if present
+        // Try DB connection after headers; if DB is down, return an SSE error event.
+        try {
+            $this->db = Database::getInstance();
+        } catch (\Throwable $e) {
+            header('HTTP/1.1 500 Internal Server Error');
+            $this->sendEvent('sse.error', ['message' => 'Database connection failed']);
+            exit;
+        }
 
         $userId = $user['id'];
         $lastChecked = date('Y-m-d H:i:s');

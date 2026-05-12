@@ -1,297 +1,377 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, BookOpen, CheckCircle, Clock, AlertCircle, Zap } from 'lucide-react';
-import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../constants/teacherTheme';
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle,
+  Clock,
+  FileText,
+  Loader2,
+  MessageCircle,
+  TrendingUp,
+  Users,
+  Zap,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TEACHER_COLORS } from '../../constants/teacherTheme';
+import { useAuth } from '../../contexts/AuthContext';
+import teacherApi from '../../api/modules/teacher.api';
 
-// Quick Stats Card Component
-const StatCard = ({ icon: Icon, label, value, change, color = TEACHER_COLORS.PRIMARY_BLUE }) => (
+const StatCard = ({ icon: Icon, label, value, helper, color = TEACHER_COLORS.PRIMARY_BLUE }) => (
   <motion.div
-    className="bg-white p-6 rounded-2xl border transition-all hover:shadow-lg"
+    className="rounded-3xl border bg-white p-6 transition-all hover:shadow-lg"
     style={{ borderColor: TEACHER_COLORS.BORDER }}
     whileHover={{ y: -4 }}
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
   >
-    <div className="flex items-start justify-between">
-      <div>
-        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm font-medium">
-          {label}
-        </p>
-        <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-bold mt-2">
-          {value}
-        </p>
-        {change && (
-          <p className="text-xs mt-2 flex items-center gap-1" style={{ color: TEACHER_COLORS.SUCCESS }}>
-            <TrendingUp size={14} /> {change}
-          </p>
-        )}
-      </div>
-      <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}20` }}>
-        <Icon size={24} style={{ color }} />
+    <div className="mb-4 flex items-start justify-between">
+      <div className="rounded-2xl p-3" style={{ backgroundColor: `${color}15`, color }}>
+        <Icon size={24} />
       </div>
     </div>
+    <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mb-1 text-xs font-bold uppercase tracking-wider">
+      {label}
+    </p>
+    <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-bold">{value}</p>
+    {helper ? (
+      <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2 text-sm">
+        {helper}
+      </p>
+    ) : null}
   </motion.div>
 );
 
-// Pending Grading Item
-const GradingItem = ({ studentName, course, submissions, daysLeft }) => (
-  <motion.div
-    className="p-4 bg-white rounded-lg border flex items-center justify-between hover:shadow-md transition-all"
-    style={{ borderColor: TEACHER_COLORS.BORDER }}
-    whileHover={{ x: 4 }}
-    initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 1, x: 0 }}
-  >
-    <div className="flex-1">
-      <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-medium">
-        {studentName}
-      </p>
-      <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
-        {course} • {submissions} submission{submissions !== 1 ? 's' : ''}
-      </p>
-    </div>
-    <div className="flex items-center gap-3">
-      {daysLeft <= 1 ? (
-        <span
-          className="px-3 py-1 rounded-full text-xs font-semibold"
-          style={{ backgroundColor: `${TEACHER_COLORS.DANGER}20`, color: TEACHER_COLORS.DANGER }}
-        >
-          Due Today
-        </span>
-      ) : (
-        <span
-          className="px-3 py-1 rounded-full text-xs font-semibold"
-          style={{ backgroundColor: `${TEACHER_COLORS.WARNING}20`, color: TEACHER_COLORS.WARNING }}
-        >
-          {daysLeft} days left
-        </span>
-      )}
-      <motion.button
-        className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
-        style={{ backgroundColor: TEACHER_COLORS.GRADE }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        Grade
-      </motion.button>
-    </div>
-  </motion.div>
-);
-
-// Upcoming Classes Item
-const ClassItem = ({ courseName, section, time, students }) => (
-  <motion.div
-    className="p-4 bg-white rounded-lg border flex items-center gap-4 hover:shadow-md transition-all"
-    style={{ borderColor: TEACHER_COLORS.BORDER }}
-    whileHover={{ y: -2 }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-  >
-    <div
-      className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-      style={{ backgroundColor: TEACHER_COLORS.CREATE }}
-    >
-      {section.slice(0, 2).toUpperCase()}
-    </div>
-    <div className="flex-1">
-      <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-medium">
-        {courseName}
-      </p>
-      <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
-        {section} • {students} students
-      </p>
-    </div>
-    <div className="flex items-center gap-2">
-      <Clock size={16} style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
-      <span style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-medium">
-        {time}
-      </span>
-    </div>
-  </motion.div>
-);
-
-// Recent Activity Item
-const ActivityItem = ({ type, student, course, time }) => (
-  <motion.div
-    className="p-4 border-b flex items-center gap-4"
-    style={{ borderColor: TEACHER_COLORS.BORDER }}
-    initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 1, x: 0 }}
-  >
-    <div
-      className="w-10 h-10 rounded-full flex items-center justify-center"
-      style={{
-        backgroundColor:
-          type === 'submission'
-            ? `${TEACHER_COLORS.CREATE}20`
-            : type === 'discussion'
-            ? `${TEACHER_COLORS.SECONDARY_INDIGO}20`
-            : `${TEACHER_COLORS.SUCCESS}20`,
-      }}
-    >
-      {type === 'submission' ? (
-        <CheckCircle size={18} style={{ color: TEACHER_COLORS.CREATE }} />
-      ) : type === 'discussion' ? (
-        <MessageCircle size={18} style={{ color: TEACHER_COLORS.SECONDARY_INDIGO }} />
-      ) : (
-        <TrendingUp size={18} style={{ color: TEACHER_COLORS.SUCCESS }} />
-      )}
-    </div>
-    <div className="flex-1">
-      <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm font-medium">
-        {type === 'submission'
-          ? `${student} submitted in ${course}`
-          : type === 'discussion'
-          ? `${student} replied in ${course}`
-          : `${student} improved in ${course}`}
-      </p>
-      <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">
-        {time}
-      </p>
-    </div>
-  </motion.div>
-);
-
-const TeacherDashboard = () => {
-  // Mock data
-  const gradingQueue = [
-    { studentName: 'Zainab Hassan', course: 'Mathematics 101', submissions: 3, daysLeft: 0 },
-    { studentName: 'Ahmed Ibrahim', course: 'Physics 102', submissions: 2, daysLeft: 1 },
-    { studentName: 'Fatima Yusuf', course: 'Chemistry 101', submissions: 1, daysLeft: 2 },
-    { studentName: 'Karim Ali', course: 'Biology 103', submissions: 4, daysLeft: 3 },
+const SectionCard = ({ section, index }) => {
+  const palette = [
+    { c1: '#2563EB', c2: '#1D4ED8' },
+    { c1: '#0F766E', c2: '#115E59' },
+    { c1: '#7C3AED', c2: '#6D28D9' },
+    { c1: '#C2410C', c2: '#9A3412' },
   ];
-
-  const upcomingClasses = [
-    { courseName: 'Mathematics 101', section: 'Section A', time: '10:00 AM', students: 32 },
-    { courseName: 'Physics 102', section: 'Section B', time: '11:30 AM', students: 28 },
-    { courseName: 'Chemistry 101', section: 'Section A', time: '2:00 PM', students: 35 },
-  ];
-
-  const recentActivity = [
-    { type: 'submission', student: 'Zainab Hassan', course: 'Mathematics 101', time: '2 min ago' },
-    { type: 'discussion', student: 'Ahmed Ibrahim', course: 'Physics 102', time: '15 min ago' },
-    { type: 'milestone', student: 'Fatima Yusuf', course: 'Chemistry 101', time: '1 hour ago' },
-    { type: 'submission', student: 'Karim Ali', course: 'Biology 103', time: '3 hours ago' },
-  ];
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
+  const colors = palette[index % palette.length];
 
   return (
-    <motion.div className="p-8" variants={containerVariants} initial="hidden" animate="visible">
-      {/* Welcome Banner */}
+    <motion.div
+      className="rounded-2xl border overflow-hidden bg-white transition-all hover:shadow-lg"
+      style={{ borderColor: TEACHER_COLORS.BORDER }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      whileHover={{ y: -3 }}
+    >
+      <div
+        className="flex items-end justify-between p-5 text-white"
+        style={{ background: `linear-gradient(135deg, ${colors.c1}, ${colors.c2})` }}
+      >
+        <div>
+          <h3 className="text-lg font-bold">{section.name}</h3>
+          <p className="text-sm opacity-90">{section.class_name || section.grade_name || 'Assigned section'}</p>
+        </div>
+        <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+          {section.type || 'Course'}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 p-5 text-center">
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <Users size={18} style={{ color: TEACHER_COLORS.ACCENT_TEAL }} className="mx-auto mb-2" />
+          <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">Students</p>
+          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold">
+            {section.students_count || 0}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <FileText size={18} style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} className="mx-auto mb-2" />
+          <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">Materials</p>
+          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold">
+            {section.materials_count || 0}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <CheckCircle size={18} style={{ color: TEACHER_COLORS.GRADE }} className="mx-auto mb-2" />
+          <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">Assignments</p>
+          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold">
+            {section.assignments_count || 0}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <Clock size={18} style={{ color: TEACHER_COLORS.WARNING }} className="mx-auto mb-2" />
+          <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">Pending</p>
+          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold">
+            {section.pending_submissions_count || 0}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const QueueItem = ({ item }) => {
+  const overdue = item.due_date ? new Date(item.due_date).getTime() < Date.now() : false;
+
+  return (
+    <motion.div
+      className="flex items-center justify-between gap-4 rounded-2xl border bg-white p-4 transition-all hover:shadow-md"
+      style={{ borderColor: TEACHER_COLORS.BORDER }}
+      whileHover={{ x: 4 }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+    >
+      <div className="flex-1">
+        <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-semibold">
+          {item.student_name}
+        </p>
+        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
+          {item.assignment_title} • {item.course_name} {item.class_name ? `• ${item.class_name}` : ''}
+        </p>
+        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-1 text-xs">
+          Submitted {formatRelativeTime(item.submitted_at)}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-2">
+        <span
+          className="rounded-full px-3 py-1 text-xs font-semibold"
+          style={{
+            backgroundColor: overdue ? `${TEACHER_COLORS.DANGER}18` : `${TEACHER_COLORS.WARNING}18`,
+            color: overdue ? TEACHER_COLORS.DANGER : TEACHER_COLORS.WARNING,
+          }}
+        >
+          {overdue ? 'Overdue' : 'Pending'}
+        </span>
+        <span style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">
+          Max {item.max_marks} marks
+        </span>
+      </div>
+    </motion.div>
+  );
+};
+
+const ActivityItem = ({ item }) => {
+  const icon =
+    item.type === 'submission' ? (
+      <CheckCircle size={18} style={{ color: TEACHER_COLORS.CREATE }} />
+    ) : item.type === 'material' ? (
+      <FileText size={18} style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />
+    ) : item.type === 'assignment' ? (
+      <Zap size={18} style={{ color: TEACHER_COLORS.GRADE }} />
+    ) : (
+      <Clock size={18} style={{ color: TEACHER_COLORS.ACCENT_TEAL }} />
+    );
+
+  const backgroundColor =
+    item.type === 'submission'
+      ? `${TEACHER_COLORS.CREATE}18`
+      : item.type === 'material'
+      ? `${TEACHER_COLORS.PRIMARY_BLUE}18`
+      : item.type === 'assignment'
+      ? `${TEACHER_COLORS.GRADE}18`
+      : `${TEACHER_COLORS.ACCENT_TEAL}18`;
+
+  return (
+    <motion.div
+      className="flex items-center gap-4 border-b p-4 last:border-b-0"
+      style={{ borderColor: TEACHER_COLORS.BORDER }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor }}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm font-medium">
+          {item.details}
+        </p>
+        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">
+          {item.actor} • {item.course_name}
+        </p>
+      </div>
+      <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs whitespace-nowrap">
+        {formatRelativeTime(item.timestamp)}
+      </p>
+    </motion.div>
+  );
+};
+
+const formatRelativeTime = (value) => {
+  if (!value) return 'Just now';
+
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return 'Just now';
+
+  const diffSeconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
+const TeacherDashboard = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const response = await teacherApi.getDashboard();
+        setDashboardData(response.data?.data ?? response.data ?? null);
+      } catch (requestError) {
+        console.error('Failed to load teacher dashboard:', requestError);
+        setError('Unable to load your dashboard data right now.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto flex h-[60vh] max-w-2xl flex-col items-center justify-center gap-4 p-8 text-center">
+        <AlertCircle size={40} style={{ color: TEACHER_COLORS.DANGER }} />
+        <h1 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-2xl font-bold">
+          Dashboard unavailable
+        </h1>
+        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>{error}</p>
+      </div>
+    );
+  }
+
+  const summary = dashboardData?.summary ?? {};
+  const courses = dashboardData?.courses ?? [];
+  const gradingQueue = dashboardData?.grading_queue ?? [];
+  const recentActivity = dashboardData?.recent_activity ?? [];
+  const firstName = user?.full_name?.split(' ')?.[0] || 'Teacher';
+
+  return (
+    <motion.div className="mx-auto max-w-7xl p-8 pb-12">
       <motion.div
-        className="mb-8 p-8 rounded-2xl text-white"
+        className="mb-8 overflow-hidden rounded-[2rem] p-8 text-white shadow-2xl"
         style={{
           background: `linear-gradient(135deg, ${TEACHER_COLORS.PRIMARY_BLUE}, ${TEACHER_COLORS.SECONDARY_INDIGO})`,
         }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold mb-2">Welcome back, Dr. Daniel 👋</h1>
-        <p className="text-blue-100 flex items-center gap-2">
+        <h1 className="mb-2 text-3xl font-bold">Welcome back, {firstName}</h1>
+        <p className="flex items-center gap-2 text-blue-100">
           <AlertCircle size={18} />
-          You have 24 submissions waiting for grading
+          Real data from your assigned courses, submissions, and activity.
         </p>
       </motion.div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={BookOpen}
-          label="Active Courses"
-          value="8"
-          change="2 new this semester"
+          label="Active Sections"
+          value={summary.active_sections ?? courses.length}
+          helper="Assigned classes and subjects"
           color={TEACHER_COLORS.PRIMARY_BLUE}
         />
         <StatCard
           icon={Users}
-          label="Total Students"
-          value="127"
-          change="+12 this week"
+          label="Enrolled Students"
+          value={summary.enrolled_students ?? 0}
+          helper="Across your assigned sections"
           color={TEACHER_COLORS.SECONDARY_INDIGO}
         />
         <StatCard
           icon={CheckCircle}
           label="Pending Submissions"
-          value="24"
-          change="5 overdue"
+          value={summary.pending_submissions ?? 0}
+          helper="Waiting for grading"
           color={TEACHER_COLORS.DANGER}
         />
         <StatCard
-          icon={Clock}
-          label="Upcoming Classes"
-          value="3"
-          change="Today"
+          icon={FileText}
+          label="Materials Uploaded"
+          value={summary.materials_uploaded ?? 0}
+          helper="Active resources in class"
           color={TEACHER_COLORS.ACCENT_TEAL}
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Pending Grading Queue - Left Column (spans 2 on desktop) */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <motion.div
           className="lg:col-span-2"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <h2 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-xl font-bold">
               Pending Grading Queue
             </h2>
-            <motion.button
-              className="text-sm font-medium px-4 py-2 rounded-lg transition-all"
-              style={{
-                color: TEACHER_COLORS.PRIMARY_BLUE,
-                backgroundColor: `${TEACHER_COLORS.PRIMARY_BLUE}10`,
-              }}
-              whileHover={{ backgroundColor: `${TEACHER_COLORS.PRIMARY_BLUE}20` }}
-            >
-              View All
-            </motion.button>
+            <span style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
+              {gradingQueue.length} items
+            </span>
           </div>
 
           <div className="space-y-4">
-            {gradingQueue.map((item, index) => (
-              <GradingItem key={index} {...item} />
-            ))}
+            {gradingQueue.length > 0 ? (
+              gradingQueue.map((item) => <QueueItem key={item.submission_id} item={item} />)
+            ) : (
+              <div className="rounded-3xl border border-dashed bg-white p-10 text-center" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                <CheckCircle size={40} style={{ color: TEACHER_COLORS.SUCCESS }} className="mx-auto mb-3" />
+                <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-semibold">
+                  No pending submissions right now.
+                </p>
+                <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2 text-sm">
+                  Grading queue is up to date for your assigned sections.
+                </p>
+              </div>
+            )}
           </div>
         </motion.div>
 
-        {/* Right Sidebar */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
           className="space-y-6"
         >
-          {/* Upcoming Classes */}
           <div>
-            <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold mb-4">
-              Today's Classes
+            <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="mb-4 text-lg font-bold">
+              Assigned Sections
             </h3>
             <div className="space-y-3">
-              {upcomingClasses.map((classItem, index) => (
-                <ClassItem key={index} {...classItem} />
-              ))}
+              {courses.length > 0 ? (
+                courses.map((course, index) => <SectionCard key={`${course.id}-${course.class_name || course.grade_name || index}`} section={course} index={index} />)
+              ) : (
+                <div className="rounded-3xl border bg-white p-6 text-center" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                  <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
+                    No assigned sections were found.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div>
-            <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold mb-4">
+            <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="mb-4 text-lg font-bold">
               Quick Actions
             </h3>
             <div className="space-y-3">
               <motion.button
-                className="w-full py-3 rounded-lg font-medium transition-all text-white flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium text-white transition-all"
                 style={{ backgroundColor: TEACHER_COLORS.CREATE }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -300,7 +380,7 @@ const TeacherDashboard = () => {
                 Create Assignment
               </motion.button>
               <motion.button
-                className="w-full py-3 rounded-lg font-medium transition-all text-white flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium text-white transition-all"
                 style={{ backgroundColor: TEACHER_COLORS.GRADE }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -309,7 +389,8 @@ const TeacherDashboard = () => {
                 Start Grading
               </motion.button>
               <motion.button
-                className="w-full py-3 rounded-lg font-medium transition-all text-white flex items-center justify-center gap-2"
+                onClick={() => navigate('/teacher/materials/upload')}
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium text-white transition-all"
                 style={{ backgroundColor: TEACHER_COLORS.ACCENT_TEAL }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -322,30 +403,36 @@ const TeacherDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Recent Activity - Full Width */}
       <motion.div
-        className="mt-8 bg-white rounded-2xl border overflow-hidden"
+        className="mt-8 overflow-hidden rounded-3xl border bg-white"
         style={{ borderColor: TEACHER_COLORS.BORDER }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <div className="p-6 border-b" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+        <div className="border-b p-6" style={{ borderColor: TEACHER_COLORS.BORDER }}>
           <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-lg font-bold">
-            Recent Student Activity
+            Recent Activity
           </h3>
         </div>
         <div>
-          {recentActivity.map((activity, index) => (
-            <ActivityItem key={index} {...activity} />
-          ))}
+          {recentActivity.length > 0 ? (
+            recentActivity.map((item, index) => <ActivityItem key={`${item.type}-${item.timestamp}-${index}`} item={item} />)
+          ) : (
+            <div className="p-8 text-center">
+              <MessageCircle size={36} style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mx-auto mb-3" />
+              <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-base font-semibold">
+                No recent activity yet.
+              </p>
+              <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2 text-sm">
+                Activity will appear here as students submit work, you post materials, and attendance is marked.
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
   );
 };
-
-// Import missing icon
-import { MessageCircle, Users } from 'lucide-react';
 
 export default TeacherDashboard;

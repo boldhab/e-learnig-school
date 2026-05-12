@@ -172,10 +172,12 @@ const AssignmentsPage = () => {
     try {
       // Get courses first to filter
       const coursesRes = await contentApi.getCourses();
-      setCourses(coursesRes.data.data);
+      const courseList = coursesRes.data?.data ?? coursesRes.data ?? [];
+      setCourses(Array.isArray(courseList) ? courseList : []);
       
       const res = await assignmentApi.getAssignments(selectedCourseId === 'all' ? '' : selectedCourseId);
-      setAssignments(res.data);
+      const assignmentList = res.data?.data ?? res.data ?? [];
+      setAssignments(Array.isArray(assignmentList) ? assignmentList : []);
     } catch (error) {
       console.error("Failed to fetch assignments:", error);
     } finally {
@@ -203,7 +205,7 @@ const AssignmentsPage = () => {
             className="px-4 py-2 rounded-xl border bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm font-medium"
           >
             <option value="all">All Courses</option>
-            {courses.map(course => (
+            {Array.isArray(courses) && courses.map(course => (
               <option key={course.id} value={course.id}>{course.name}</option>
             ))}
           </select>
@@ -214,7 +216,7 @@ const AssignmentsPage = () => {
         <div className="h-64 flex items-center justify-center">
           <Loader2 className="animate-spin text-blue-600" size={48} />
         </div>
-      ) : assignments.length === 0 ? (
+      ) : !Array.isArray(assignments) || assignments.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed p-20 text-center">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200">
             <BookOpen size={40} />

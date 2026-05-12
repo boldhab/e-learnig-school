@@ -4,6 +4,7 @@ import { Upload, FileText, CheckCircle2, Loader2, ArrowLeft, AlertCircle } from 
 import { useNavigate } from 'react-router-dom';
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
 import contentApi from '../../api/modules/content.api';
+import teacherApi from '../../api/modules/teacher.api';
 import toast from 'react-hot-toast';
 
 const UploadMaterialPage = () => {
@@ -21,24 +22,66 @@ const UploadMaterialPage = () => {
     file: null
   });
 
+  const [assignedSections, setAssignedSections] = useState([]);
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [coursesRes, gradesRes] = await Promise.all([
-          contentApi.getCourses(),
-          contentApi.getCategories('Grade')
-        ]);
-        setCourses(coursesRes.data.data);
-        setGrades(gradesRes.data);
+        const response = await teacherApi.getDashboard();
+        const data = response.data?.data ?? response.data;
+        const sections = data?.courses ?? [];
+        setAssignedSections(sections);
+        
+        // Get unique courses from assigned sections
+        const uniqueCourses = [];
+        const courseIds = new Set();
+        
+        sections.forEach(section => {
+          if (!courseIds.has(section.id)) {
+            courseIds.add(section.id);
+            uniqueCourses.push({
+              id: section.id,
+              name: section.name
+            });
+          }
+        });
+        
+        setCourses(uniqueCourses);
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        toast.error("Failed to load courses or grades");
+        toast.error("Failed to load your assigned courses");
       } finally {
         setLoading(false);
       }
     };
     fetchInitialData();
   }, []);
+
+  // Update available grades when course changes
+  useEffect(() => {
+    if (formData.course_id) {
+      const availableGrades = assignedSections
+        .filter(section => section.id == formData.course_id)
+        .map(section => ({
+          id: section.class_id || section.grade_id,
+          name: section.class_name || section.grade_name || 'Assigned Class'
+        }));
+      
+      // Only update if grades actually changed
+      if (JSON.stringify(availableGrades) !== JSON.stringify(grades)) {
+        setGrades(availableGrades);
+      }
+      
+      // Clear class_id if not in available grades
+      const gradeExists = availableGrades.find(g => g.id == formData.class_id);
+      if (formData.class_id && !gradeExists) {
+        setFormData(prev => ({ ...prev, class_id: '' }));
+      }
+    } else {
+      if (grades.length > 0) setGrades([]);
+      if (formData.class_id) setFormData(prev => ({ ...prev, class_id: '' }));
+    }
+  }, [formData.course_id, assignedSections]);
 
   const handleFileChange = (e) => {
     setFormData({ ...formData, file: e.target.files[0] });

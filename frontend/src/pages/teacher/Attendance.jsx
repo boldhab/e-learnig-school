@@ -32,9 +32,10 @@ const AttendancePage = () => {
     const fetchCourses = async () => {
       try {
         const res = await contentApi.getCourses();
-        setCourses(res.data.data);
-        if (res.data.data.length > 0) {
-          setSelectedCourseId(res.data.data[0].id);
+        const courseList = res.data?.data ?? res.data ?? [];
+        setCourses(Array.isArray(courseList) ? courseList : []);
+        if (Array.isArray(courseList) && courseList.length > 0) {
+          setSelectedCourseId(courseList[0].id);
         }
       } catch (error) {
         toast.error("Failed to load courses");
@@ -53,12 +54,12 @@ const AttendancePage = () => {
       try {
         // 1. Fetch Students
         const studentsRes = await contentApi.getCourseStudents(selectedCourseId);
-        const studentList = studentsRes.data.data;
-        setStudents(studentList);
+        const studentList = studentsRes.data?.data ?? studentsRes.data ?? [];
+        setStudents(Array.isArray(studentList) ? studentList : []);
 
         // 2. Fetch Existing Attendance for this date
         const existingRes = await attendanceApi.getCourseAttendance(selectedCourseId, selectedDate);
-        const existing = existingRes.data.data;
+        const existing = existingRes.data?.data ?? existingRes.data ?? [];
 
         // Initialize records: merge existing or default to 'present'
         const initialRecords = {};
@@ -107,9 +108,9 @@ const AttendancePage = () => {
     }
   };
 
-  const filteredStudents = students.filter(s => 
+  const filteredStudents = Array.isArray(students) ? students.filter(s => 
     s.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   if (loading) {
     return (

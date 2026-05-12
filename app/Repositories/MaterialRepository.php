@@ -8,7 +8,7 @@ class MaterialRepository {
     protected $db;
 
     public function __construct() {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance();
     }
 
     public function create($data) {
@@ -60,5 +60,22 @@ class MaterialRepository {
     public function delete($id) {
         $stmt = $this->db->prepare("DELETE FROM materials WHERE id = :id");
         return $stmt->execute(['id' => $id]);
+    }
+
+    // Aliases for ContentService compatibility
+    public function createMaterial($data) {
+        return $this->create($data);
+    }
+
+    public function getMaterialsByClassAndSubject($classId, $subjectId = null) {
+        return $this->getByCourse($subjectId, $classId);
+    }
+
+    public function getMaterialById($id) {
+        return $this->findById($id);
+    }
+
+    public function deleteMaterial($id) {
+        return $this->delete($id);
     }
 }

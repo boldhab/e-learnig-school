@@ -42,9 +42,11 @@ const Dashboard = () => {
           contentApi.getCourses(),
           assignmentApi.getStudentAssignments()
         ]);
-        setStats(statsRes.data.data);
-        setCourses(coursesRes.data.data);
-        setAssignments(assignmentsRes.data.data.slice(0, 3)); // Only top 3
+        setStats(statsRes.data?.data ?? statsRes.data);
+        const courseList = coursesRes.data?.data ?? coursesRes.data ?? [];
+        setCourses(Array.isArray(courseList) ? courseList : []);
+        const assignmentList = assignmentsRes.data?.data ?? assignmentsRes.data ?? [];
+        setAssignments(Array.isArray(assignmentList) ? assignmentList.slice(0, 3) : []); // Only top 3
       } catch (error) {
         console.error("Dashboard fetch failed:", error);
       } finally {
@@ -104,7 +106,7 @@ const Dashboard = () => {
               <button className="text-sm font-bold text-blue-600 hover:underline">View All</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courses.map((course) => (
+              {Array.isArray(courses) && courses.map((course) => (
                 <motion.div
                   key={course.id}
                   className="p-5 bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer"
@@ -131,7 +133,7 @@ const Dashboard = () => {
               <button className="text-sm font-bold text-blue-600 hover:underline">Full Schedule</button>
             </div>
             <div className="space-y-4">
-              {assignments.length === 0 ? (
+              {!Array.isArray(assignments) || assignments.length === 0 ? (
                 <div className="p-10 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                   <p className="text-slate-400 font-medium">No upcoming assignments. Great job!</p>
                 </div>

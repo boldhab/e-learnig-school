@@ -33,8 +33,9 @@ const GradeSubmissionsPage = () => {
         assignmentApi.getAssignmentDetails(id),
         assignmentApi.getAssignmentSubmissions(id)
       ]);
-      setAssignment(assignmentRes.data);
-      setSubmissions(submissionsRes.data.data);
+      setAssignment(assignmentRes.data?.data ?? assignmentRes.data);
+      const subs = submissionsRes.data?.data ?? submissionsRes.data ?? [];
+      setSubmissions(Array.isArray(subs) ? subs : []);
     } catch (error) {
       console.error("Failed to fetch data:", error);
       toast.error("Failed to load submissions");
@@ -65,9 +66,9 @@ const GradeSubmissionsPage = () => {
     }
   };
 
-  const filteredSubmissions = submissions.filter(s => 
+  const filteredSubmissions = Array.isArray(submissions) ? submissions.filter(s => 
     s.student_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   if (loading) {
     return (
@@ -101,7 +102,7 @@ const GradeSubmissionsPage = () => {
             <div className="bg-green-50 px-6 py-3 rounded-2xl border border-green-100 text-center">
               <p className="text-[10px] uppercase font-bold text-green-600 mb-1">Graded</p>
               <p className="text-2xl font-bold text-green-900">
-                {submissions.filter(s => s.status === 'graded').length}
+                {Array.isArray(submissions) ? submissions.filter(s => s.status === 'graded').length : 0}
               </p>
             </div>
           </div>

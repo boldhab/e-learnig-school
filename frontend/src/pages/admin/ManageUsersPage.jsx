@@ -20,9 +20,18 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 		setLoading(true);
 		try {
 			const res = await adminApi.getUsers();
-			setUsers(res.data?.data || res.data || []);
+			const payload = res?.data?.data ?? res?.data ?? [];
+			const list = Array.isArray(payload)
+				? payload
+				: Array.isArray(payload?.users)
+					? payload.users
+					: Array.isArray(payload?.data)
+						? payload.data
+						: [];
+			setUsers(list);
 		} catch (err) {
 			console.error("Failed to fetch users:", err);
+			setUsers([]);
 		} finally {
 			setLoading(false);
 		}
@@ -44,9 +53,10 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 		pending: 'amber',
 	};
 
+	const safeUsers = useMemo(() => (Array.isArray(users) ? users : []), [users]);
+
 	const filteredUsers = useMemo(() => {
-		if (!users) return [];
-		return users.filter((user) => {
+		return safeUsers.filter((user) => {
 			const name = user.full_name || '';
 			const email = user.email || '';
 			const role = (user.role_name || '').toLowerCase();
@@ -55,7 +65,7 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 			const matchesRole = roleFilter === 'all' ? true : role === roleFilter.toLowerCase();
 			return matchesQuery && matchesRole;
 		});
-	}, [users, query, roleFilter]);
+	}, [safeUsers, query, roleFilter]);
 
 	if (loading) {
 		return (
@@ -106,10 +116,10 @@ const ManageUsersPage = ({ defaultRole = 'all' }) => {
 
 				<div className="grid gap-4 md:grid-cols-4">
 					{[
-						{ title: 'Total Users', value: users.length, trend: 'Real-time', icon: ShieldCheck },
-						{ title: 'Active Accounts', value: users.filter(u => u.status === 'active').length, trend: 'Live', icon: CheckCircle2 },
-						{ title: 'Teachers', value: users.filter(u => u.role_name === 'TEACHER').length, trend: 'Staff', icon: Filter },
-						{ title: 'Students', value: users.filter(u => u.role_name === 'STUDENT').length, trend: 'Students', icon: XCircle },
+						{ title: 'Total Users', value: safeUsers.length, trend: 'Real-time', icon: ShieldCheck },
+						{ title: 'Active Accounts', value: safeUsers.filter(u => u.status === 'active').length, trend: 'Live', icon: CheckCircle2 },
+						{ title: 'Teachers', value: safeUsers.filter(u => u.role_name === 'TEACHER').length, trend: 'Staff', icon: Filter },
+						{ title: 'Students', value: safeUsers.filter(u => u.role_name === 'STUDENT').length, trend: 'Students', icon: XCircle },
 					].map((metric) => (
 						<AdminCard key={metric.title} className="p-5">
 							<div className="flex items-start justify-between gap-3">

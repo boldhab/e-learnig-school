@@ -1,11 +1,23 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, Bell, ChevronDown } from 'lucide-react';
 import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../../constants/teacherTheme';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const TeacherHeader = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [notifications, setNotifications] = useState(5);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/auth/login');
+    }
+  };
 
   return (
     <motion.header
@@ -101,6 +113,7 @@ const TeacherHeader = () => {
                   color: TEACHER_COLORS.DANGER,
                   borderColor: TEACHER_COLORS.BORDER,
                 }}
+                onClick={handleLogout}
               >
                 Logout
               </button>

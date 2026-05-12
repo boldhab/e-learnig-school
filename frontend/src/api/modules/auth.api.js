@@ -22,6 +22,12 @@ const authApi = {
     const response = await api.get('/auth/me');
     return response.data?.data ?? response.data;
   },
+
+  register: async (payload) => {
+    // payload: { full_name, username, email, password, grade_name?, class_id? }
+    const response = await api.post('/auth/register', payload);
+    return response.data?.data ?? response.data;
+  },
 };
 
 export default authApi;

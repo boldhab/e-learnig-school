@@ -305,9 +305,11 @@ const TeacherGrading = () => {
     },
   ];
 
-  if (!selectedSubmission && submissions.length > 0) {
-    setSelectedSubmission(submissions[0]);
-  }
+  useEffect(() => {
+    if (!selectedSubmission && submissions.length > 0) {
+      setSelectedSubmission(submissions[0]);
+    }
+  }, [selectedSubmission, submissions]);
 
   const handlePublish = (marks, feedback) => {
     alert(`Published grade: ${marks}/100\nFeedback: ${feedback}`);

@@ -3,6 +3,8 @@ import AdminMainLayout from '../components/admin/layout/AdminMainLayout';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
 import ManageUsersPage from '../pages/admin/ManageUsersPage';
 import ManageCoursesPage from '../pages/admin/ManageCoursesPage';
+import AdminCourseDetailsPage from '../pages/admin/AdminCourseDetailsPage';
+import AdminClassDetailsPage from '../pages/admin/AdminClassDetailsPage';
 import AssignmentsOverviewPage from '../pages/admin/AssignmentsOverviewPage';
 import DiscussionsMonitoringPage from '../pages/admin/DiscussionsMonitoringPage';
 import AttendanceReportsPage from '../pages/admin/AttendanceReportsPage';
@@ -21,6 +23,9 @@ const AdminRoutes = () => (
       <Route path="teachers" element={<ManageUsersPage defaultRole="teacher" />} />
       <Route path="students" element={<ManageUsersPage defaultRole="student" />} />
       <Route path="courses" element={<ManageCoursesPage />} />
+      <Route path="courses/:courseId" element={<AdminCourseDetailsPage />} />
+      <Route path="courses/departments/:departmentId/classes/:classId" element={<AdminClassDetailsPage />} />
+      <Route path="courses/classes/:classId" element={<AdminClassDetailsPage />} />
       <Route path="assignments" element={<AssignmentsOverviewPage />} />
       <Route path="discussions" element={<DiscussionsMonitoringPage />} />
       <Route path="attendance" element={<AttendanceReportsPage />} />

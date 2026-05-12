@@ -21,6 +21,42 @@ class AdminController extends BaseController {
         $this->validation = new Validation();
     }
 
+    private function ensureAcademicTables($db) {
+        $db->exec("CREATE TABLE IF NOT EXISTS department_teacher_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            department_id INT NOT NULL,
+            teacher_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_teacher_department (teacher_id),
+            UNIQUE KEY unique_department_teacher (department_id, teacher_id),
+            FOREIGN KEY (department_id) REFERENCES categories(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS class_course_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            department_id INT,
+            class_id INT NOT NULL,
+            course_id INT NOT NULL,
+            teacher_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_class_course (class_id, course_id),
+            FOREIGN KEY (class_id) REFERENCES categories(id) ON DELETE CASCADE,
+            FOREIGN KEY (course_id) REFERENCES categories(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS course_teacher_pool (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            course_id INT NOT NULL,
+            teacher_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_course_teacher (course_id, teacher_id),
+            FOREIGN KEY (course_id) REFERENCES categories(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     public function createStudent(Request $request, Response $response) {
         $this->requireRole('ADMIN');
         $data = HtmlSanitizer::sanitize($request->getBody());
@@ -58,8 +94,9 @@ class AdminController extends BaseController {
 
         try {
             $id = $this->userService->createTeacher($data);
-            if (!empty($data['course_id']) && !empty($data['class_id'])) {
-                $this->adminService->assignTeacherToCourse($id, $data['course_id'], $data['class_id']);
+            $classIds = $data['class_ids'] ?? (!empty($data['class_id']) ? [$data['class_id']] : []);
+            if (!empty($data['course_id']) && !empty($classIds)) {
+                $this->adminService->assignTeacherToCourse($id, $data['course_id'], $classIds);
             }
             $this->success(['user_id' => $id], 'Teacher created and assigned successfully', 201);
         } catch (Exception $e) {
@@ -150,11 +187,13 @@ class AdminController extends BaseController {
     public function assignTeacher(Request $request, Response $response) {
         $this->requireRole('ADMIN');
         $data = HtmlSanitizer::sanitize($request->getBody());
-        if (empty($data['teacher_id']) || empty($data['course_id']) || empty($data['class_id'])) {
-            $this->error('Teacher ID, Course ID, and Class ID are required', 422);
+        $classIds = $data['class_ids'] ?? (!empty($data['class_id']) ? [$data['class_id']] : []);
+
+        if (empty($data['teacher_id']) || empty($data['course_id']) || empty($classIds)) {
+            $this->error('Teacher ID, Course ID, and at least one Class ID are required', 422);
         }
         try {
-            $this->adminService->assignTeacherToCourse($data['teacher_id'], $data['course_id'], $data['class_id']);
+            $this->adminService->assignTeacherToCourse($data['teacher_id'], $data['course_id'], $classIds);
             $this->success([], 'Teacher assigned to course and class successfully');
         } catch (Exception $e) {
             $this->error($e->getMessage());
@@ -316,8 +355,551 @@ class AdminController extends BaseController {
         $this->requireRole('ADMIN');
         try {
             $db = \App\Core\Database::getInstance();
-            $classes = $db->query("SELECT id, name FROM categories WHERE type = 'Grade'")->fetchAll();
+            $requiredGrades = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+            $existingGrades = $db->query("SELECT id, name FROM categories WHERE type = 'Grade' ORDER BY name ASC")->fetchAll();
+            $existingNames = array_map(function ($grade) {
+                return strtolower(trim($grade['name']));
+            }, $existingGrades);
+
+            $insertStmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (?, 'Grade', NULL)");
+            foreach ($requiredGrades as $gradeName) {
+                if (!in_array(strtolower($gradeName), $existingNames, true)) {
+                    $insertStmt->execute([$gradeName]);
+                }
+            }
+
+            $classes = $db->query("\n                SELECT\n                    g.id,\n                    g.name,\n                    (SELECT COUNT(*)\n                        FROM users u\n                        WHERE u.class_id = g.id\n                          AND u.role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1)\n                    ) AS students_count,\n                    (SELECT COUNT(*)\n                        FROM teacher_assignments ta\n                        WHERE ta.class_id = g.id\n                    ) AS teacher_assignments_count\n                FROM categories g\n                WHERE g.type = 'Grade'\n                ORDER BY g.name ASC\n            ")->fetchAll();
             $this->success($classes);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function createClass(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+        $data = HtmlSanitizer::sanitize($request->getBody());
+
+        if (empty($data['name'])) {
+            $this->error('Class name is required', 422);
+        }
+
+        try {
+            $db = \App\Core\Database::getInstance();
+            $stmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (:name, 'Grade', NULL)");
+            $stmt->execute(['name' => $data['name']]);
+            $classId = (int) $db->lastInsertId();
+
+            $studentIds = $data['student_ids'] ?? [];
+            if (is_array($studentIds)) {
+                foreach ($studentIds as $studentId) {
+                    if (!empty($studentId)) {
+                        $this->adminService->assignStudentToClass((int) $studentId, $classId);
+                    }
+                }
+            }
+
+            $this->success(['class_id' => $classId], 'Class created successfully', 201);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function updateClass(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+        $data = HtmlSanitizer::sanitize($request->getBody());
+
+        if (empty($data['name'])) {
+            $this->error('Class name is required', 422);
+        }
+
+        try {
+            $db = \App\Core\Database::getInstance();
+            $stmt = $db->prepare("UPDATE categories SET name = :name WHERE id = :id AND type = 'Grade'");
+            $stmt->execute([
+                'id' => (int) $id,
+                'name' => $data['name'],
+            ]);
+
+            if (array_key_exists('student_ids', $data)) {
+                $studentIds = is_array($data['student_ids']) ? array_map('intval', $data['student_ids']) : [];
+                $studentIds = array_values(array_filter($studentIds, fn ($studentId) => $studentId > 0));
+
+                $currentStudentStmt = $db->prepare("SELECT id FROM users WHERE class_id = :class_id AND role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1)");
+                $currentStudentStmt->execute(['class_id' => (int) $id]);
+                $currentStudentIds = array_map('intval', $currentStudentStmt->fetchAll(\PDO::FETCH_COLUMN));
+
+                foreach (array_diff($currentStudentIds, $studentIds) as $studentId) {
+                    $this->userService->updateUser($studentId, ['class_id' => null]);
+                }
+
+                foreach ($studentIds as $studentId) {
+                    $this->adminService->assignStudentToClass($studentId, (int) $id);
+                }
+            }
+
+            $this->success([], 'Class updated successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function deleteClass(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            $materialCountStmt = $db->prepare("SELECT COUNT(*) FROM materials WHERE class_id = ?");
+            $materialCountStmt->execute([(int) $id]);
+            if ((int) $materialCountStmt->fetchColumn() > 0) {
+                $this->error('This class still has uploaded materials. Reassign or remove them before deleting the class.', 422);
+            }
+
+            $studentStmt = $db->prepare("UPDATE users SET class_id = NULL WHERE class_id = ?");
+            $studentStmt->execute([(int) $id]);
+
+            $db->prepare("DELETE FROM teacher_assignments WHERE class_id = ?")->execute([(int) $id]);
+            $db->prepare("DELETE FROM categories WHERE id = ? AND type = 'Grade'")->execute([(int) $id]);
+
+            $this->success([], 'Class deleted successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function deleteCourse(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            // Check if course has any assignments
+            $assignmentStmt = $db->prepare("SELECT COUNT(*) FROM assignments WHERE course_id = ?");
+            $assignmentStmt->execute([(int) $id]);
+            if ((int) $assignmentStmt->fetchColumn() > 0) {
+                $this->error('This course has assignments. Remove them before deleting the course.', 422);
+            }
+
+            // Delete teacher assignments for this course
+            $db->prepare("DELETE FROM teacher_assignments WHERE course_id = ?")->execute([(int) $id]);
+
+            // Delete the course category
+            $db->prepare("DELETE FROM categories WHERE id = ? AND type = 'Course'")->execute([(int) $id]);
+
+            $this->success([], 'Course deleted successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getClassDetails(Request $request, Response $response, $classId) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            // Get class info
+            $classStmt = $db->prepare("SELECT id, name FROM categories WHERE id = ? AND type = 'Grade'");
+            $classStmt->execute([(int) $classId]);
+            $classData = $classStmt->fetch();
+
+            if (!$classData) {
+                $this->error('Class not found', 404);
+            }
+
+            // Get students in this class
+            $studentRoleStmt = $db->prepare("SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1");
+            $studentRoleStmt->execute();
+            $studentRoleId = (int) $studentRoleStmt->fetchColumn();
+
+            $studentsStmt = $db->prepare("
+                SELECT u.id, u.full_name, u.student_id, u.email
+                FROM users u
+                WHERE u.class_id = ? AND u.role_id = ? AND u.status = 'active'
+                ORDER BY u.full_name ASC
+            ");
+            $studentsStmt->execute([(int) $classId, $studentRoleId]);
+            $students = $studentsStmt->fetchAll();
+
+            // Get assigned courses and teachers for this class
+            $coursesStmt = $db->prepare("
+                SELECT
+                    cca.id,
+                    cca.course_id,
+                    cca.teacher_id,
+                    c.name AS course_name,
+                    u.full_name AS teacher_name
+                FROM class_course_assignments cca
+                INNER JOIN categories c ON c.id = cca.course_id
+                INNER JOIN users u ON u.id = cca.teacher_id
+                WHERE cca.class_id = ?
+                ORDER BY c.name ASC
+            ");
+            $coursesStmt->execute([(int) $classId]);
+            $assignedCourses = $coursesStmt->fetchAll();
+
+            $this->success([
+                'class' => $classData,
+                'students' => $students,
+                'assigned_courses' => $assignedCourses
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getAvailableStudentsForClass(Request $request, Response $response, $classId) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            $classStmt = $db->prepare("SELECT id, name FROM categories WHERE id = ? AND type = 'Grade' LIMIT 1");
+            $classStmt->execute([(int) $classId]);
+            $classRow = $classStmt->fetch();
+
+            if (!$classRow) {
+                $this->error('Class not found', 404);
+            }
+
+            $studentRoleStmt = $db->prepare("SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1");
+            $studentRoleStmt->execute();
+            $studentRoleId = (int) $studentRoleStmt->fetchColumn();
+
+            $studentsStmt = $db->prepare("
+                SELECT u.id, u.full_name, u.student_id, u.email
+                FROM users u
+                WHERE u.role_id = ?
+                  AND u.status = 'active'
+                  AND (u.class_id IS NULL OR u.class_id = 0)
+                ORDER BY u.full_name ASC
+            ");
+            $studentsStmt->execute([$studentRoleId]);
+            $availableStudents = $studentsStmt->fetchAll();
+
+            $this->success([
+                'class' => [
+                    'id' => (int) $classRow['id'],
+                    'name' => $classRow['name'],
+                ],
+                'students' => $availableStudents,
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function removeStudentFromClass(Request $request, Response $response, $classId) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $data = $request->getBody();
+            if (empty($data['student_id'])) {
+                $this->error('Student ID is required', 400);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $studentId = (int) $data['student_id'];
+            $classId = (int) $classId;
+
+            // Verify the student is actually in this class
+            $checkStmt = $db->prepare("SELECT id FROM users WHERE id = ? AND class_id = ?");
+            $checkStmt->execute([$studentId, $classId]);
+            if (!$checkStmt->fetch()) {
+                $this->error('Student is not assigned to this class', 404);
+            }
+
+            // Unassign the student
+            $updateStmt = $db->prepare("UPDATE users SET class_id = NULL WHERE id = ?");
+            $updateStmt->execute([$studentId]);
+
+            $this->success([], 'Student removed from class successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getAcademicDepartments(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $teacherRoleStmt = $db->prepare("SELECT id FROM roles WHERE role_name = 'TEACHER' LIMIT 1");
+            $teacherRoleStmt->execute();
+            $teacherRoleId = (int) $teacherRoleStmt->fetchColumn();
+
+            // All active teachers
+            $allTeachersStmt = $db->prepare("
+                SELECT u.id, u.full_name
+                FROM users u
+                WHERE u.role_id = ? AND u.status = 'active'
+                ORDER BY u.full_name ASC
+            ");
+            $allTeachersStmt->execute([$teacherRoleId]);
+            $allTeachers = $allTeachersStmt->fetchAll();
+
+            // All courses with their teacher pools
+            $allCourses = $db->query("
+                SELECT id, name
+                FROM categories
+                WHERE type IN ('Course', 'Subject')
+                ORDER BY name ASC
+            ")->fetchAll();
+
+            $courseTeacherStmt = $db->prepare("
+                SELECT u.id, u.full_name
+                FROM course_teacher_pool ctp
+                INNER JOIN users u ON u.id = ctp.teacher_id
+                WHERE ctp.course_id = ?
+                ORDER BY u.full_name ASC
+            ");
+            foreach ($allCourses as &$course) {
+                $courseTeacherStmt->execute([(int) $course['id']]);
+                $course['teachers'] = $courseTeacherStmt->fetchAll();
+            }
+            unset($course);
+
+            // All classes (Grade) with their assigned courses
+            $allClasses = $db->query("
+                SELECT id, name
+                FROM categories
+                WHERE type = 'Grade'
+                ORDER BY name ASC
+            ")->fetchAll();
+
+            $assignedCoursesStmt = $db->prepare("
+                SELECT
+                    cca.id,
+                    cca.course_id,
+                    cca.teacher_id,
+                    c.name AS course_name,
+                    u.full_name AS teacher_name,
+                    g.name AS class_name
+                FROM class_course_assignments cca
+                INNER JOIN categories c ON c.id = cca.course_id
+                INNER JOIN users u ON u.id = cca.teacher_id
+                INNER JOIN categories g ON g.id = cca.class_id
+                WHERE cca.class_id = ?
+                ORDER BY c.name ASC
+            ");
+            foreach ($allClasses as &$classRow) {
+                $assignedCoursesStmt->execute([(int) $classRow['id']]);
+                $classRow['assigned_courses'] = $assignedCoursesStmt->fetchAll();
+            }
+            unset($classRow);
+
+            $this->success([
+                'all_teachers' => $allTeachers,
+                'all_courses' => $allCourses,
+                'all_classes' => $allClasses,
+                // Keep legacy keys for backward compatibility
+                'available_teachers' => $allTeachers,
+                'departments' => [],
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function createDepartment(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $name = trim((string) ($data['name'] ?? ''));
+            if ($name === '') {
+                $this->error('Department name is required', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $existsStmt = $db->prepare(" 
+                SELECT id
+                FROM categories
+                WHERE type = 'Subject' AND parent_id IS NULL AND LOWER(name) = LOWER(?)
+                LIMIT 1
+            ");
+            $existsStmt->execute([$name]);
+            if ($existsStmt->fetch()) {
+                $this->error('Department already exists', 422);
+            }
+
+            $stmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (?, 'Subject', NULL)");
+            $stmt->execute([$name]);
+
+            $this->success(['department_id' => (int) $db->lastInsertId()], 'Department created successfully', 201);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function assignTeacherToDepartment(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $teacherId = (int) ($data['teacher_id'] ?? 0);
+            $departmentId = (int) $id;
+
+            if ($teacherId <= 0) {
+                $this->error('Teacher ID is required', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $departmentStmt = $db->prepare("SELECT id FROM categories WHERE id = ? AND type = 'Subject' AND parent_id IS NULL LIMIT 1");
+            $departmentStmt->execute([$departmentId]);
+            if (!$departmentStmt->fetch()) {
+                $this->error('Department not found', 404);
+            }
+
+            $teacherStmt = $db->prepare(" 
+                SELECT u.id
+                FROM users u
+                INNER JOIN roles r ON r.id = u.role_id
+                WHERE u.id = ? AND r.role_name = 'TEACHER'
+                LIMIT 1
+            ");
+            $teacherStmt->execute([$teacherId]);
+            if (!$teacherStmt->fetch()) {
+                $this->error('Teacher not found', 404);
+            }
+
+            $alreadyAssignedStmt = $db->prepare("SELECT department_id FROM department_teacher_assignments WHERE teacher_id = ? LIMIT 1");
+            $alreadyAssignedStmt->execute([$teacherId]);
+            $existing = $alreadyAssignedStmt->fetch();
+            if ($existing && (int) $existing['department_id'] !== $departmentId) {
+                $this->error('Teacher is already assigned to another department', 422);
+            }
+
+            $assignStmt = $db->prepare("INSERT IGNORE INTO department_teacher_assignments (department_id, teacher_id) VALUES (?, ?)");
+            $assignStmt->execute([$departmentId, $teacherId]);
+
+            $this->success([], 'Teacher assigned to department successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function createDepartmentClass(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $classId = (int) ($data['class_id'] ?? 0);
+            $name = trim((string) ($data['name'] ?? ''));
+            $departmentId = (int) $id;
+
+            if ($classId <= 0 && $name === '') {
+                $this->error('Select a class or provide a class name', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $departmentStmt = $db->prepare("SELECT id FROM categories WHERE id = ? AND type = 'Subject' AND parent_id IS NULL LIMIT 1");
+            $departmentStmt->execute([$departmentId]);
+            if (!$departmentStmt->fetch()) {
+                $this->error('Department not found', 404);
+            }
+
+            if ($classId > 0) {
+                $classStmt = $db->prepare("SELECT id, parent_id FROM categories WHERE id = ? AND type = 'Grade' LIMIT 1");
+                $classStmt->execute([$classId]);
+                $classRow = $classStmt->fetch();
+
+                if (!$classRow) {
+                    $this->error('Class not found', 404);
+                }
+
+                if (!empty($classRow['parent_id']) && (int) $classRow['parent_id'] !== $departmentId) {
+                    $this->error('Class is already assigned to another department', 422);
+                }
+
+                if ((int) $classRow['parent_id'] === $departmentId) {
+                    $this->success(['class_id' => (int) $classRow['id']], 'Class already linked to this department');
+                }
+
+                $linkStmt = $db->prepare("UPDATE categories SET parent_id = ? WHERE id = ? AND type = 'Grade'");
+                $linkStmt->execute([$departmentId, $classId]);
+
+                $this->success(['class_id' => $classId], 'Class linked to department successfully');
+            }
+
+            $existsStmt = $db->prepare(" 
+                SELECT id
+                FROM categories
+                WHERE type = 'Grade' AND parent_id = ? AND LOWER(name) = LOWER(?)
+                LIMIT 1
+            ");
+            $existsStmt->execute([$departmentId, $name]);
+            if ($existsStmt->fetch()) {
+                $this->error('Grade/Class already exists in this department', 422);
+            }
+
+            $stmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (?, 'Grade', ?)");
+            $stmt->execute([$name, $departmentId]);
+
+            $this->success(['class_id' => (int) $db->lastInsertId()], 'Grade/Class created successfully', 201);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function assignCourseToClass(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $classId = (int) $id;
+            $teacherId = (int) ($data['teacher_id'] ?? 0);
+            $courseId = isset($data['course_id']) ? (int) $data['course_id'] : 0;
+
+            if ($teacherId <= 0 || $courseId <= 0) {
+                $this->error('Course and teacher are required', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $classStmt = $db->prepare("SELECT id FROM categories WHERE id = ? AND type = 'Grade' LIMIT 1");
+            $classStmt->execute([$classId]);
+            if (!$classStmt->fetch()) {
+                $this->error('Class not found', 404);
+            }
+
+            $courseStmt = $db->prepare("SELECT id FROM categories WHERE id = ? AND type = 'Course' LIMIT 1");
+            $courseStmt->execute([$courseId]);
+            if (!$courseStmt->fetch()) {
+                $this->error('Course not found', 404);
+            }
+
+            // Validate teacher is in the course's teacher pool
+            $poolStmt = $db->prepare("SELECT id FROM course_teacher_pool WHERE course_id = ? AND teacher_id = ? LIMIT 1");
+            $poolStmt->execute([$courseId, $teacherId]);
+            if (!$poolStmt->fetch()) {
+                $this->error('Selected teacher is not assigned to this course', 422);
+            }
+
+            $duplicateStmt = $db->prepare("SELECT id FROM class_course_assignments WHERE class_id = ? AND course_id = ? LIMIT 1");
+            $duplicateStmt->execute([$classId, $courseId]);
+            if ($duplicateStmt->fetch()) {
+                $this->error('This course is already assigned to the selected class', 422);
+            }
+
+            $insertStmt = $db->prepare("INSERT INTO class_course_assignments (department_id, class_id, course_id, teacher_id) VALUES (NULL, ?, ?, ?)");
+            $insertStmt->execute([$classId, $courseId, $teacherId]);
+
+            // Keep legacy teacher_assignments in sync for existing analytics/pages.
+            $db->prepare("DELETE FROM teacher_assignments WHERE class_id = ? AND course_id = ?")->execute([$classId, $courseId]);
+            $legacyInsertStmt = $db->prepare("INSERT INTO teacher_assignments (teacher_id, course_id, class_id) VALUES (?, ?, ?)");
+            $legacyInsertStmt->execute([$teacherId, $courseId, $classId]);
+
+            $this->success([], 'Course assigned to class successfully');
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }
@@ -329,6 +911,94 @@ class AdminController extends BaseController {
             $db = \App\Core\Database::getInstance();
             $courses = $db->query("SELECT id, name FROM categories WHERE type = 'Course' OR type = 'Subject'")->fetchAll();
             $this->success($courses);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function createCourse(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $name = trim((string) ($data['name'] ?? ''));
+            $teacherIds = isset($data['teacher_ids']) && is_array($data['teacher_ids'])
+                ? array_map('intval', $data['teacher_ids'])
+                : [];
+
+            if ($name === '') {
+                $this->error('Course name is required', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $existsStmt = $db->prepare("SELECT id FROM categories WHERE type = 'Course' AND LOWER(name) = LOWER(?) LIMIT 1");
+            $existsStmt->execute([$name]);
+            if ($existsStmt->fetch()) {
+                $this->error('A course with this name already exists', 422);
+            }
+
+            $insertStmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (?, 'Course', NULL)");
+            $insertStmt->execute([$name]);
+            $courseId = (int) $db->lastInsertId();
+
+            if (!empty($teacherIds)) {
+                $poolStmt = $db->prepare("INSERT IGNORE INTO course_teacher_pool (course_id, teacher_id) VALUES (?, ?)");
+                foreach ($teacherIds as $tid) {
+                    if ($tid > 0) {
+                        $poolStmt->execute([$courseId, $tid]);
+                    }
+                }
+            }
+
+            $this->success(['course_id' => $courseId], 'Course created successfully', 201);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getCourseTeachers(Request $request, Response $response, $id) {
+        $this->requireRole('ADMIN');
+        try {
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+            $courseId = (int) $id;
+
+            $stmt = $db->prepare("
+                SELECT u.id, u.full_name
+                FROM course_teacher_pool ctp
+                INNER JOIN users u ON u.id = ctp.teacher_id
+                WHERE ctp.course_id = ?
+                ORDER BY u.full_name ASC
+            ");
+            $stmt->execute([$courseId]);
+            $this->success($stmt->fetchAll());
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function createStandaloneClass(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+        try {
+            $data = HtmlSanitizer::sanitize($request->getBody());
+            $name = trim((string) ($data['name'] ?? ''));
+            if ($name === '') {
+                $this->error('Class name is required', 422);
+            }
+
+            $db = \App\Core\Database::getInstance();
+            $this->ensureAcademicTables($db);
+
+            $existsStmt = $db->prepare("SELECT id FROM categories WHERE type = 'Grade' AND LOWER(name) = LOWER(?) LIMIT 1");
+            $existsStmt->execute([$name]);
+            if ($existsStmt->fetch()) {
+                $this->error('A class with this name already exists', 422);
+            }
+
+            $stmt = $db->prepare("INSERT INTO categories (name, type, parent_id) VALUES (?, 'Grade', NULL)");
+            $stmt->execute([$name]);
+            $this->success(['class_id' => (int) $db->lastInsertId()], 'Class created successfully', 201);
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }

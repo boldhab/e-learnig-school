@@ -2,6 +2,7 @@ import React, { Suspense, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { toast } from 'react-hot-toast';
+import RegisterPage from './pages/auth/RegisterPage';
 
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { SkeletonLoader } from './components/common/UIComponents';
@@ -227,6 +228,7 @@ function App() {
               <Routes>
                 {/* Public route — login page */}
                 <Route path="/auth/login" element={<LoginPage />} />
+                <Route path="/auth/register" element={<RegisterPage />} />
 
                 {/* Protected: Student */}
                 <Route
