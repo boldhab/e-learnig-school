@@ -180,14 +180,21 @@ const Dashboard = () => {
           <div className="bg-white p-8 rounded-[2rem] border shadow-sm" style={{ borderColor: COLORS.BORDER }}>
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
               <Calendar size={20} className="text-blue-600" />
-              Calendar
+              Latest Announcement
             </h3>
             <div className="space-y-4">
-              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                <p className="text-xs font-bold text-blue-600 mb-1">Upcoming Event</p>
-                <p className="text-sm font-bold text-slate-900">Mid-term Examination Week</p>
-                <p className="text-xs text-slate-500 mt-1">Starts in 5 days</p>
-              </div>
+              {stats?.upcoming_event ? (
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <p className="text-xs font-bold text-blue-600 mb-1">Upcoming Event</p>
+                  <p className="text-sm font-bold text-slate-900">{stats.upcoming_event.title}</p>
+                  <p className="text-xs text-slate-500 mt-1">{stats.upcoming_event.message.substring(0, 50)}...</p>
+                  <p className="text-[10px] text-blue-400 mt-2 font-bold uppercase">{new Date(stats.upcoming_event.created_at).toLocaleDateString()}</p>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-sm text-slate-500 text-center">No upcoming events or announcements.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

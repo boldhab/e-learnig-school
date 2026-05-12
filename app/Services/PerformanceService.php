@@ -125,6 +125,13 @@ class PerformanceService {
         $stmt = $db->prepare($assignSql);
         $stmt->execute(['sid' => $studentId]);
         $stats['pending_assignments'] = (int)$stmt->fetchColumn();
+        
+        // 5. Latest Announcement (Upcoming Event)
+        $annSql = "SELECT title, message, created_at FROM announcements 
+                   WHERE (target_role = 'all' OR target_role = 'student') 
+                   AND is_active = 1 
+                   ORDER BY created_at DESC LIMIT 1";
+        $stats['upcoming_event'] = $db->query($annSql)->fetch(\PDO::FETCH_ASSOC) ?: null;
 
         return $stats;
     }

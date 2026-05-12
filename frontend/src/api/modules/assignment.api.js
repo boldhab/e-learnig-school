@@ -19,7 +19,9 @@ const assignmentApi = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   
-  getMySubmissions: () => api.get("student/submissions")
+  getMySubmissions: () => api.get("student/submissions"),
+
+  getStudentAssignments: (courseId = '') => api.get(`assignments?course_id=${courseId}`)
 };
 
 export default assignmentApi;

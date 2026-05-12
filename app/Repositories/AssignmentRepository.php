@@ -71,4 +71,34 @@ class AssignmentRepository {
         $stmt = $this->db->prepare($sql);
         return $stmt->execute(['id' => $id]);
     }
+
+    /**
+     * Get assignments for a specific class based on teacher assignments.
+     */
+    public function getByClass($classId) {
+        if (!$classId) return [];
+
+        // Find parent class ID
+        $parentStmt = $this->db->prepare("SELECT parent_id FROM categories WHERE id = ?");
+        $parentStmt->execute([$classId]);
+        $parentId = $parentStmt->fetchColumn();
+
+        $ids = [$classId];
+        if ($parentId) $ids[] = $parentId;
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        
+        $sql = "SELECT a.*, c.name as course_name, u.full_name as author_name,
+                (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.id) as submission_count
+                FROM assignments a
+                JOIN categories c ON a.course_id = c.id
+                JOIN teacher_assignments ta ON c.id = ta.course_id
+                JOIN users u ON a.created_by = u.id
+                WHERE ta.class_id IN ($placeholders)
+                GROUP BY a.id
+                ORDER BY a.created_at DESC";
+                
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($ids);
+        return $stmt->fetchAll();
+    }
 }

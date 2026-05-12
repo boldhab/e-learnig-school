@@ -18,9 +18,13 @@ class AttendanceController extends BaseController {
         $this->userService = new UserService();
     }
 
+    /**
+     * POST /api/attendance/bulk
+     * Body: { course_id, attendance_date, records: [{student_id, status, remarks}] }
+     */
     public function bulkMark(Request $request, Response $response) {
         $this->requireRole(['ADMIN', 'TEACHER']);
-        
+
         $data = HtmlSanitizer::sanitize($request->getBody());
         $data['teacher_id'] = $GLOBALS['auth_user']['id'];
 
@@ -28,39 +32,75 @@ class AttendanceController extends BaseController {
             return $this->error('Missing required fields for bulk attendance', 422);
         }
 
+        if (!is_array($data['records']) || count($data['records']) === 0) {
+            return $this->error('Records array cannot be empty', 422);
+        }
+
         try {
-            $this->attendanceService->bulkMarkAttendance($data);
-            $this->success([], 'Attendance marked successfully');
+            $result = $this->attendanceService->bulkMarkAttendance($data);
+            $message = "Attendance marked successfully for {$result['success_count']} out of {$result['total_records']} students";
+            
+            if (!empty($result['errors'])) {
+                $message .= ". Some records had errors: " . implode('; ', array_slice($result['errors'], 0, 3));
+                if (count($result['errors']) > 3) {
+                    $message .= " and " . (count($result['errors']) - 3) . " more errors";
+                }
+            }
+            
+            $this->success($result, $message);
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }
     }
 
+    /**
+     * GET /api/attendance/course?course_id=X&date=Y
+     * Returns all attendance records for a given course and date.
+     */
     public function getCourseAttendance(Request $request, Response $response) {
         $this->requireRole(['ADMIN', 'TEACHER']);
-        $courseId = $request->getBody()['course_id'] ?? null;
-        $date = $request->getBody()['date'] ?? date('Y-m-d');
 
-        if (!$courseId) return $this->error('Course ID required', 400);
+        // GET request — read from query string
+        $courseId = $_GET['course_id'] ?? null;
+        $date     = $_GET['date']      ?? date('Y-m-d');
+
+        if (!$courseId) {
+            return $this->error('Course ID required', 400);
+        }
 
         try {
-            $attendance = $this->attendanceService->getCourseAttendance($courseId, $date);
+            $attendance = $this->attendanceService->getCourseAttendance((int)$courseId, $date);
             $this->success($attendance);
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }
     }
 
+    /**
+     * GET /api/attendance/student
+     * Returns the authenticated student's attendance records + summary.
+     */
     public function getStudentAttendance(Request $request, Response $response) {
         $this->requireAuth();
         $user = $GLOBALS['auth_user'];
-        $studentId = ($user['role_name'] === 'STUDENT') ? $user['id'] : ($request->getBody()['student_id'] ?? null);
 
-        if (!$studentId) return $this->error('Student ID required', 400);
+        // Students can only see their own; admins/teachers can pass student_id
+        $studentId = ($user['role_name'] === 'STUDENT')
+            ? (int)$user['id']
+            : (int)($_GET['student_id'] ?? 0);
+
+        if (!$studentId) {
+            return $this->error('Student ID required', 400);
+        }
 
         try {
-            $attendance = $this->attendanceService->getStudentAttendance($studentId);
-            $this->success($attendance);
+            $records = $this->attendanceService->getStudentAttendance($studentId);
+            $summary = $this->attendanceService->getStudentAttendanceSummary($studentId);
+
+            $this->success([
+                'records' => $records,
+                'summary' => $summary,
+            ]);
         } catch (Exception $e) {
             $this->error($e->getMessage());
         }

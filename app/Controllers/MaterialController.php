@@ -36,11 +36,12 @@ class MaterialController extends BaseController {
 
     public function list(Request $request, Response $response) {
         $this->requireAuth();
-        $courseId = $request->getBody()['course_id'] ?? null;
-        $classId = $request->getBody()['class_id'] ?? null;
+        $body = $request->getBody();
+        $courseId = $body['course_id'] ?? $body['subject_id'] ?? null;
+        $classId = $body['class_id'] ?? null;
 
         if (!$courseId) {
-            return $this->error('Course ID is required', 400);
+            return $this->error('Course or Subject ID is required', 400);
         }
 
         try {

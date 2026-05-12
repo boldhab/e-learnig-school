@@ -120,7 +120,8 @@ const DiscussionThread = ({ topic }) => {
     setLoading(true);
     try {
       const response = await communicationApi.getMessages(topic.id);
-      setMessages(response.data.data);
+      const data = response.data?.data ?? response.data ?? [];
+      setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch messages:", error);
     } finally {
@@ -178,7 +179,7 @@ const DiscussionThread = ({ topic }) => {
     }
   };
 
-  if (loading && messages.length === 0) {
+  if (loading && (!messages || messages.length === 0)) {
     return (
       <div className="bg-white rounded-2xl border p-12 flex flex-col items-center justify-center" style={{ borderColor: COLORS.BORDER }}>
         <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
@@ -203,7 +204,7 @@ const DiscussionThread = ({ topic }) => {
 
       {/* Messages */}
       <div className="flex-1 p-6 overflow-y-auto space-y-4 scroll-smooth">
-        {messages.length === 0 ? (
+        {!messages || messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-200">
               <MessageCircle size={32} />
@@ -284,9 +285,9 @@ const DiscussionsPage = () => {
     const fetchGroups = async () => {
       try {
         const response = await communicationApi.getGroups();
-        const groupData = response.data.data;
-        setGroups(groupData);
-        if (groupData.length > 0) {
+        const groupData = response.data?.data ?? response.data ?? [];
+        setGroups(Array.isArray(groupData) ? groupData : []);
+        if (Array.isArray(groupData) && groupData.length > 0) {
           setSelectedGroup(groupData[0]);
         }
       } catch (error) {
@@ -304,7 +305,8 @@ const DiscussionsPage = () => {
       if (!selectedGroup) return;
       try {
         const response = await communicationApi.getTopics(selectedGroup.id);
-        setTopics(response.data.data);
+        const data = response.data?.data ?? response.data ?? [];
+        setTopics(Array.isArray(data) ? data : []);
         setActiveTopic(null); // Reset active topic when group changes
       } catch (error) {
         console.error("Failed to fetch topics:", error);
@@ -313,9 +315,9 @@ const DiscussionsPage = () => {
     fetchTopics();
   }, [selectedGroup]);
 
-  const filteredTopics = topics.filter((t) =>
+  const filteredTopics = Array.isArray(topics) ? topics.filter((t) =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   if (loading) {
     return (
@@ -342,7 +344,7 @@ const DiscussionsPage = () => {
         </div>
       </header>
 
-      {groups.length === 0 ? (
+      {!groups || groups.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <MessageCircle size={40} className="text-slate-300" />

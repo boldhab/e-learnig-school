@@ -15,15 +15,28 @@ class CourseRepository {
      * Get all courses for a student based on their class_id.
      */
     public function getCoursesByStudent($classId) {
+        if (!$classId) return [];
+
+        // Find parent class ID (e.g. Grade for a specific Section)
+        $parentStmt = $this->db->prepare("SELECT parent_id FROM categories WHERE id = ?");
+        $parentStmt->execute([$classId]);
+        $parentId = $parentStmt->fetchColumn();
+
+        $ids = [$classId];
+        if ($parentId) $ids[] = $parentId;
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
         $sql = "SELECT c.*, u.full_name as teacher_name,
-                (SELECT COUNT(*) FROM materials m WHERE m.subject_id = c.id AND m.class_id = :class_id) as materials_count
+                (SELECT COUNT(*) FROM materials m WHERE m.subject_id = c.id AND m.class_id IN ($placeholders)) as materials_count
                 FROM categories c
                 JOIN teacher_assignments ta ON c.id = ta.course_id
-                JOIN users u ON ta.teacher_id = u.id
-                WHERE ta.class_id = :class_id AND c.type IN ('Course', 'Subject')";
+                LEFT JOIN users u ON ta.teacher_id = u.id
+                WHERE ta.class_id IN ($placeholders) AND c.type IN ('Course', 'Subject')
+                GROUP BY c.id";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['class_id' => $classId]);
+        // We need to pass the IDs twice (once for subquery, once for WHERE)
+        $stmt->execute(array_merge($ids, $ids));
         return $stmt->fetchAll();
     }
 
@@ -84,18 +97,42 @@ class CourseRepository {
     }
 
     /**
-     * Get all courses (Admin only).
+     * Get students enrolled in a course, optionally scoped to a specific class.
+     * When class_id is provided only students of that class are returned.
      */
-    public function getStudentsByCourse(int $courseId): array {
-        $sql = "SELECT u.id, u.full_name, u.student_id as student_code, u.class_id
+    public function getStudentsByCourse(int $courseId, ?int $classId = null): array {
+        $params = ['course_id' => $courseId];
+
+        $classFilter = '';
+        if ($classId) {
+            $classFilter = ' AND ta.class_id = :class_id';
+            $params['class_id'] = $classId;
+        }
+
+        $sql = "SELECT DISTINCT
+                    u.id,
+                    u.full_name,
+                    u.student_id AS student_code,
+                    u.class_id,
+                    cl.name AS class_name
                 FROM users u
                 JOIN teacher_assignments ta ON u.class_id = ta.class_id
+                JOIN categories cl ON cl.id = u.class_id
                 WHERE ta.course_id = :course_id
-                AND u.role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT')
+                  {$classFilter}
+                  AND u.role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1)
                 ORDER BY u.full_name ASC";
-        
+
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['course_id' => $courseId]);
-        return $stmt->fetchAll();
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Alias used by AdminController / generic list.
+     */
+    public function getAll(): array {
+        $sql = "SELECT * FROM categories WHERE type IN ('Course','Subject') ORDER BY name ASC";
+        return $this->db->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
     }
 }

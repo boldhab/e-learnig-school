@@ -32,16 +32,26 @@ class MaterialRepository {
     }
 
     public function getByCourse($courseId, $classId = null) {
+        $ids = [];
+        if ($classId) {
+            $ids[] = $classId;
+            $parentStmt = $this->db->prepare("SELECT parent_id FROM categories WHERE id = ?");
+            $parentStmt->execute([$classId]);
+            $parentId = $parentStmt->fetchColumn();
+            if ($parentId) $ids[] = $parentId;
+        }
+
         $sql = "SELECT m.*, u.full_name as author_name 
                 FROM materials m
                 JOIN users u ON m.uploaded_by = u.id
-                WHERE m.subject_id = :course_id";
+                WHERE m.subject_id = ?";
         
-        $params = ['course_id' => $courseId];
+        $params = [$courseId];
         
-        if ($classId) {
-            $sql .= " AND m.class_id = :class_id";
-            $params['class_id'] = $classId;
+        if (!empty($ids)) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sql .= " AND m.class_id IN ($placeholders)";
+            $params = array_merge($params, $ids);
         }
 
         $sql .= " ORDER BY m.created_at DESC";

@@ -25,7 +25,8 @@ class CourseController extends BaseController {
     public function students(Request $request, Response $response, $id) {
         $this->requireRole(['ADMIN', 'TEACHER']);
         try {
-            $students = $this->courseService->getCourseStudents((int)$id);
+            $classId = isset($_GET['class_id']) ? (int)$_GET['class_id'] : null;
+            $students = $this->courseService->getCourseStudents((int)$id, $classId);
             $this->success($students);
         } catch (Exception $e) {
             $this->error($e->getMessage());

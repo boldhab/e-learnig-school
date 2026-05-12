@@ -9,6 +9,7 @@ import TeacherGrading from '../pages/teacher/Grading';
 import TeacherAnalytics from '../pages/teacher/Analytics';
 import UploadMaterialPage from '../pages/teacher/UploadMaterialPage';
 import GradeSubmissionsPage from '../pages/teacher/GradeSubmissionsPage';
+import CreateAssignmentPage from '../pages/teacher/CreateAssignmentPage';
 
 const TeacherRoutes = () => {
   return (
@@ -23,6 +24,7 @@ const TeacherRoutes = () => {
         <Route path="grading"      element={<TeacherGrading />} />
         <Route path="analytics"    element={<TeacherAnalytics />} />
         <Route path="materials/upload" element={<UploadMaterialPage />} />
+        <Route path="assignments/create" element={<CreateAssignmentPage />} />
         <Route path="assignments/:id/grade" element={<GradeSubmissionsPage />} />
         {/* Catch-all → default teacher page */}
         <Route path="*" element={<Navigate to="dashboard" replace />} />

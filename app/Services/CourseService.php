@@ -22,7 +22,7 @@ class CourseService {
         return [];
     }
 
-    public function getCourseStudents(int $courseId): array {
-        return $this->courseRepo->getStudentsByCourse($courseId);
+    public function getCourseStudents(int $courseId, ?int $classId = null): array {
+        return $this->courseRepo->getStudentsByCourse($courseId, $classId);
     }
 }

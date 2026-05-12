@@ -85,10 +85,10 @@ const AdminDashboardPage = () => {
 
       {/* Primary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Users" value={stats?.total_users} icon={Users} trend="+12%" color="#2563EB" />
+        <StatCard title="Total Users" value={stats?.total_users} icon={Users} trend={stats?.user_trend} color="#2563EB" />
         <StatCard title="Academic Courses" value={stats?.total_courses} icon={BookOpen} color="#10B981" />
         <StatCard title="Active Discussions" value={stats?.active_discussions} icon={MessageSquare} color="#8B5CF6" />
-        <StatCard title="System Integrity" value="99.9%" icon={ShieldCheck} color="#059669" />
+        <StatCard title="System Integrity" value={stats?.system_integrity || "99.9%"} icon={ShieldCheck} color="#059669" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

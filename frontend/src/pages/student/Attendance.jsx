@@ -1,103 +1,86 @@
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, CheckCircle, XCircle, AlertCircle, BarChart3 } from 'lucide-react';
+import {
+  Calendar,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  BarChart3,
+  Loader2,
+  Clock,
+} from 'lucide-react';
 import { COLORS } from '../../constants/theme';
+import attendanceApi from '../../api/modules/attendance.api';
 
-// Attendance Stats Card
-const AttendanceStatCard = ({ icon: Icon, label, value, percentage, color }) => (
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ icon: Icon, label, value, sub, color, delay = 0 }) => (
   <motion.div
     className="bg-white p-6 rounded-2xl border"
     style={{ borderColor: COLORS.BORDER }}
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay }}
     whileHover={{ y: -4 }}
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
   >
     <div className="flex items-center justify-between mb-3">
-      <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm font-medium">
-        {label}
-      </p>
-      <div
-        className="p-3 rounded-lg"
-        style={{
-          backgroundColor: `${color}15`,
-        }}
-      >
+      <p className="text-sm font-medium" style={{ color: COLORS.TEXT_SECONDARY }}>{label}</p>
+      <div className="p-2.5 rounded-lg" style={{ backgroundColor: `${color}18` }}>
         <Icon size={20} style={{ color }} />
       </div>
     </div>
-    <p className="text-3xl font-bold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
-      {value}
-    </p>
-    <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm">
-      {percentage}% attendance rate
-    </p>
+    <p className="text-3xl font-bold mb-1" style={{ color: COLORS.TEXT_PRIMARY }}>{value}</p>
+    <p className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>{sub}</p>
   </motion.div>
 );
 
-// Calendar Heatmap
-const AttendanceCalendar = () => {
-  const daysInMonth = 31;
-  const firstDayOfMonth = 2; // 0 = Sunday, 2 = Tuesday (May 1st, 2026)
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
+// ─── Calendar Heatmap ─────────────────────────────────────────────────────────
+const AttendanceCalendar = ({ records }) => {
+  const today = new Date();
+  const year  = today.getFullYear();
+  const month = today.getMonth(); // 0-indexed
 
-  // Generate sample attendance data
-  const getAttendanceStatus = (day) => {
-    const random = Math.random();
-    if (day < 5 || day > 28) return 'empty';
-    if (random < 0.05) return 'absent';
-    if (random < 0.15) return 'late';
-    return 'present';
-  };
+  const monthName  = today.toLocaleString('default', { month: 'long' });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay    = new Date(year, month, 1).getDay(); // 0 = Sun
+
+  // Build a map: "YYYY-MM-DD" → status
+  const statusMap = useMemo(() => {
+    const map = {};
+    records.forEach(r => {
+      const key = r.attendance_date?.split('T')[0] ?? r.attendance_date;
+      if (key) map[key] = r.status;
+    });
+    return map;
+  }, [records]);
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'present':
-        return COLORS.EMERALD_GREEN;
-      case 'absent':
-        return COLORS.DANGER;
-      case 'late':
-        return COLORS.WARNING;
-      default:
-        return COLORS.BORDER;
+      case 'present': return COLORS.EMERALD_GREEN || '#10b981';
+      case 'absent':  return COLORS.DANGER        || '#ef4444';
+      case 'late':    return COLORS.WARNING        || '#f59e0b';
+      default:        return null;
     }
   };
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'present':
-        return 'Present';
-      case 'absent':
-        return 'Absent';
-      case 'late':
-        return 'Late';
-      default:
-        return '';
+      case 'present': return 'Present';
+      case 'absent':  return 'Absent';
+      case 'late':    return 'Late';
+      default:        return '';
     }
   };
 
-  const days = Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    return {
-      day,
-      status: getAttendanceStatus(day),
-    };
-  });
-
-  const gridDays = Array(firstDayOfMonth)
-    .fill(null)
-    .concat(days);
+  // Array of day cells; null = empty padding
+  const cells = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const day    = i + 1;
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const status  = statusMap[dateStr] || null;
+      return { day, dateStr, status };
+    }),
+  ];
 
   return (
     <motion.div
@@ -105,277 +88,342 @@ const AttendanceCalendar = () => {
       style={{ borderColor: COLORS.BORDER }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 }}
+      transition={{ delay: 0.15 }}
     >
       <h3 className="text-xl font-bold mb-6" style={{ color: COLORS.TEXT_PRIMARY }}>
-        May 2026 - Attendance Calendar
+        {monthName} {year} — Attendance Calendar
       </h3>
 
-      {/* Calendar Grid */}
-      <div className="mb-6">
-        {/* Week Days Header */}
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div
-              key={day}
-              className="text-center text-xs font-semibold py-2"
-              style={{ color: COLORS.TEXT_SECONDARY }}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
+      {/* Week day labels */}
+      <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+          <div key={d} className="text-center text-xs font-semibold py-1.5"
+            style={{ color: COLORS.TEXT_SECONDARY }}>
+            {d}
+          </div>
+        ))}
+      </div>
 
-        {/* Calendar Days */}
-        <div className="grid grid-cols-7 gap-2">
-          {gridDays.map((item, idx) => (
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-1.5">
+        {cells.map((cell, idx) => {
+          if (!cell) {
+            return <div key={`empty-${idx}`} className="aspect-square" />;
+          }
+          const bg = getStatusColor(cell.status);
+          const isToday = cell.dateStr === today.toISOString().split('T')[0];
+
+          return (
             <motion.div
-              key={idx}
-              className="aspect-square rounded-lg flex items-center justify-center cursor-pointer relative group"
+              key={cell.dateStr}
+              className="aspect-square rounded-lg flex items-center justify-center relative group cursor-default"
               style={{
-                backgroundColor:
-                  item?.status === 'empty' ? 'transparent' : getStatusColor(item?.status),
-                opacity: item?.status === 'empty' ? 0.3 : 1,
+                backgroundColor: bg || (COLORS.BORDER || '#e5e7eb') + '55',
+                outline: isToday ? '2px solid #3b82f6' : 'none',
+                outlineOffset: '1px',
               }}
-              whileHover={
-                item?.status !== 'empty'
-                  ? { scale: 1.1 }
-                  : { scale: 1 }
-              }
+              whileHover={bg ? { scale: 1.12 } : {}}
             >
-              {item?.day && (
-                <>
-                  <span
-                    className="text-xs font-bold"
-                    style={{
-                      color:
-                        item?.status === 'empty' || item?.status === 'present'
-                          ? '#FFFFFF'
-                          : '#FFFFFF',
-                    }}
-                  >
-                    {item.day}
-                  </span>
-                  {/* Tooltip */}
-                  {item?.status !== 'empty' && (
-                    <div
-                      className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {getStatusLabel(item?.status)}
-                    </div>
-                  )}
-                </>
+              <span
+                className="text-xs font-bold select-none"
+                style={{ color: bg ? '#fff' : (COLORS.TEXT_SECONDARY || '#6b7280') }}
+              >
+                {cell.day}
+              </span>
+
+              {/* Tooltip */}
+              {cell.status && (
+                <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-semibold px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  {getStatusLabel(cell.status)}
+                </div>
               )}
             </motion.div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* Legend */}
-      <div className="flex gap-6 justify-center flex-wrap">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-4 h-4 rounded"
-            style={{ backgroundColor: COLORS.EMERALD_GREEN }}
-          />
-          <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Present
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-4 h-4 rounded"
-            style={{ backgroundColor: COLORS.DANGER }}
-          />
-          <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Absent
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-4 h-4 rounded"
-            style={{ backgroundColor: COLORS.WARNING }}
-          />
-          <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
-            Late
-          </span>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// Subject Attendance
-const SubjectAttendance = () => {
-  const subjects = [
-    { name: 'Web Development', present: 18, absent: 1, total: 20, percentage: 90 },
-    { name: 'Database Design', present: 16, absent: 2, total: 18, percentage: 89 },
-    { name: 'Data Structures', present: 19, absent: 1, total: 20, percentage: 95 },
-    { name: 'UI/UX Design', present: 17, absent: 0, total: 17, percentage: 100 },
-    { name: 'Cloud Computing', present: 15, absent: 2, total: 17, percentage: 88 },
-  ];
-
-  return (
-    <motion.div
-      className="bg-white p-6 rounded-2xl border"
-      style={{ borderColor: COLORS.BORDER }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-    >
-      <h3 className="text-xl font-bold mb-6" style={{ color: COLORS.TEXT_PRIMARY }}>
-        Subject-wise Attendance
-      </h3>
-      <div className="space-y-4">
-        {subjects.map((subject, idx) => (
-          <motion.div key={idx} className="pb-4 border-b last:border-b-0" style={{ borderColor: COLORS.BORDER }}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
-                {subject.name}
-              </p>
-              <p className="font-bold text-sm" style={{ color: COLORS.EMERALD_GREEN }}>
-                {subject.percentage}%
-              </p>
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <motion.div
-                  className="h-2 rounded-full"
-                  style={{ backgroundColor: COLORS.EMERALD_GREEN }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${subject.percentage}%` }}
-                  transition={{ duration: 0.8, delay: idx * 0.1 }}
-                />
-              </div>
-            </div>
-            <div className="flex gap-4 text-xs">
-              <span style={{ color: COLORS.TEXT_SECONDARY }}>
-                <span style={{ color: COLORS.EMERALD_GREEN }} className="font-semibold">
-                  {subject.present}
-                </span>{' '}
-                Present
-              </span>
-              <span style={{ color: COLORS.TEXT_SECONDARY }}>
-                <span style={{ color: COLORS.DANGER }} className="font-semibold">
-                  {subject.absent}
-                </span>{' '}
-                Absent
-              </span>
-              <span style={{ color: COLORS.TEXT_SECONDARY }}>Total: {subject.total}</span>
-            </div>
-          </motion.div>
+      <div className="flex gap-5 justify-center flex-wrap mt-6">
+        {[
+          { label: 'Present', color: COLORS.EMERALD_GREEN || '#10b981' },
+          { label: 'Absent',  color: COLORS.DANGER        || '#ef4444' },
+          { label: 'Late',    color: COLORS.WARNING        || '#f59e0b' },
+          { label: 'No data', color: (COLORS.BORDER || '#e5e7eb') },
+        ].map(({ label, color }) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: color }} />
+            <span className="text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>{label}</span>
+          </div>
         ))}
       </div>
     </motion.div>
   );
 };
 
-// Attendance Policy
-const AttendancePolicy = () => (
+// ─── Per-course breakdown ─────────────────────────────────────────────────────
+const CourseBreakdown = ({ courses }) => (
   <motion.div
     className="bg-white p-6 rounded-2xl border"
     style={{ borderColor: COLORS.BORDER }}
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.4 }}
+    transition={{ delay: 0.25 }}
   >
-    <h3 className="text-lg font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
-      Attendance Policy
+    <h3 className="text-xl font-bold mb-6" style={{ color: COLORS.TEXT_PRIMARY }}>
+      Subject-wise Attendance
     </h3>
-    <div className="space-y-3">
-      <div className="flex gap-3 p-3 rounded-lg" style={{ backgroundColor: COLORS.BACKGROUND }}>
-        <AlertCircle size={20} style={{ color: COLORS.WARNING, flexShrink: 0 }} />
-        <div>
-          <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
-            Minimum Attendance Requirement
-          </p>
-          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm mt-1">
-            80% attendance is required to sit for final exams
-          </p>
-        </div>
+
+    {courses.length === 0 ? (
+      <p className="text-center py-8" style={{ color: COLORS.TEXT_SECONDARY }}>
+        No attendance records yet.
+      </p>
+    ) : (
+      <div className="space-y-5">
+        {courses.map((course, idx) => {
+          const pct = parseFloat(course.percentage) || 0;
+          const barColor = pct >= 80
+            ? (COLORS.EMERALD_GREEN || '#10b981')
+            : pct >= 60
+              ? (COLORS.WARNING || '#f59e0b')
+              : (COLORS.DANGER  || '#ef4444');
+
+          return (
+            <motion.div
+              key={course.course_id}
+              className="pb-4 border-b last:border-b-0"
+              style={{ borderColor: COLORS.BORDER }}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + idx * 0.06 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
+                  {course.course_name}
+                </p>
+                <p className="font-bold text-sm" style={{ color: barColor }}>
+                  {pct}%
+                </p>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+                <motion.div
+                  className="h-2 rounded-full"
+                  style={{ backgroundColor: barColor }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.7, delay: 0.35 + idx * 0.06 }}
+                />
+              </div>
+              <div className="flex gap-4 text-xs" style={{ color: COLORS.TEXT_SECONDARY }}>
+                <span>
+                  <span style={{ color: COLORS.EMERALD_GREEN || '#10b981' }} className="font-semibold">
+                    {course.present}
+                  </span>{' '}Present
+                </span>
+                <span>
+                  <span style={{ color: COLORS.DANGER || '#ef4444' }} className="font-semibold">
+                    {course.absent}
+                  </span>{' '}Absent
+                </span>
+                <span>
+                  <span style={{ color: COLORS.WARNING || '#f59e0b' }} className="font-semibold">
+                    {course.late}
+                  </span>{' '}Late
+                </span>
+                <span>Total: {course.total}</span>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
-      <div className="flex gap-3 p-3 rounded-lg" style={{ backgroundColor: COLORS.BACKGROUND }}>
-        <AlertCircle size={20} style={{ color: COLORS.DANGER, flexShrink: 0 }} />
-        <div>
-          <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
-            Current Status
-          </p>
-          <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-sm mt-1">
-            You are meeting the attendance requirement. Keep it up!
-          </p>
-        </div>
-      </div>
-    </div>
+    )}
   </motion.div>
 );
 
-// Main Attendance Page
+// ─── Attendance Policy ────────────────────────────────────────────────────────
+const AttendancePolicy = ({ overallPct }) => {
+  const meetsRequirement = overallPct >= 80;
+  return (
+    <motion.div
+      className="bg-white p-6 rounded-2xl border"
+      style={{ borderColor: COLORS.BORDER }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35 }}
+    >
+      <h3 className="text-lg font-bold mb-4" style={{ color: COLORS.TEXT_PRIMARY }}>
+        Attendance Policy
+      </h3>
+      <div className="space-y-3">
+        <div className="flex gap-3 p-3 rounded-lg" style={{ backgroundColor: COLORS.BACKGROUND || '#f8fafc' }}>
+          <AlertCircle size={20} style={{ color: COLORS.WARNING || '#f59e0b', flexShrink: 0 }} />
+          <div>
+            <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>
+              Minimum Requirement
+            </p>
+            <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
+              80% attendance is required to sit for final exams.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 p-3 rounded-lg" style={{ backgroundColor: COLORS.BACKGROUND || '#f8fafc' }}>
+          <AlertCircle
+            size={20}
+            style={{ color: meetsRequirement ? (COLORS.EMERALD_GREEN || '#10b981') : (COLORS.DANGER || '#ef4444'), flexShrink: 0 }}
+          />
+          <div>
+            <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>Current Status</p>
+            <p className="text-sm mt-1" style={{ color: COLORS.TEXT_SECONDARY }}>
+              {overallPct > 0
+                ? meetsRequirement
+                  ? `You're at ${overallPct}% — meeting the requirement. Keep it up!`
+                  : `You're at ${overallPct}% — below the 80% requirement. Attend more classes.`
+                : 'No attendance data recorded yet.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+const Skeleton = ({ className }) => (
+  <div className={`animate-pulse bg-slate-100 rounded-xl ${className}`} />
+);
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 const AttendancePage = () => {
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords]   = useState([]);
+  const [summary, setSummary]   = useState(null);
+  const [error, setError]       = useState(null);
+
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res  = await attendanceApi.getStudentAttendance();
+        const body = res.data?.data ?? res.data ?? {};
+
+        // API returns { records: [...], summary: { overall: {...}, by_course: [...] } }
+        setRecords(body.records  ?? []);
+        setSummary(body.summary  ?? null);
+      } catch (err) {
+        console.error('Failed to fetch attendance:', err);
+        setError('Could not load attendance data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAttendance();
+  }, []);
+
+  // ── Stats derived from summary ─────────────────────────────────────────────
+  const overall    = summary?.overall   ?? { total: 0, present: 0, absent: 0, late: 0, percentage: 0 };
+  const byCourse   = summary?.by_course ?? [];
+  const overallPct = parseFloat(overall.percentage) || 0;
+
+  // ── Skeleton loading ───────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="p-6 pb-12">
+        <div className="mb-8">
+          <Skeleton className="h-9 w-64 mb-2" />
+          <Skeleton className="h-5 w-80" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+        </div>
+        <Skeleton className="h-80 rounded-2xl mb-8" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-64 rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh]">
+        <AlertCircle size={48} className="mb-4 text-red-400" />
+        <p className="text-lg font-semibold text-slate-700">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 pb-12">
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
         <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
           Attendance Tracking
         </h1>
-        <p style={{ color: COLORS.TEXT_SECONDARY }} className="text-lg">
+        <p className="text-lg" style={{ color: COLORS.TEXT_SECONDARY }}>
           Monitor your class attendance and participation
         </p>
       </motion.div>
 
-      {/* Stats Cards */}
-      <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ staggerChildren: 0.1 }}
-      >
-        <AttendanceStatCard
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
           icon={CheckCircle}
           label="Overall Attendance"
-          value="92%"
-          percentage="92"
-          color={COLORS.EMERALD_GREEN}
+          value={`${overallPct}%`}
+          sub={`${overall.total} total classes`}
+          color={COLORS.EMERALD_GREEN || '#10b981'}
+          delay={0}
         />
-        <AttendanceStatCard
+        <StatCard
           icon={Calendar}
           label="Classes Present"
-          value="89"
-          percentage="92"
-          color={COLORS.PRIMARY_BLUE}
+          value={overall.present ?? 0}
+          sub={`${overallPct}% attendance rate`}
+          color={COLORS.PRIMARY_BLUE || '#3b82f6'}
+          delay={0.05}
         />
-        <AttendanceStatCard
-          icon={AlertCircle}
+        <StatCard
+          icon={XCircle}
           label="Classes Absent"
-          value="3"
-          percentage="8"
-          color={COLORS.DANGER}
+          value={overall.absent ?? 0}
+          sub={overall.total > 0 ? `${Math.round((overall.absent / overall.total) * 100)}% absence rate` : '—'}
+          color={COLORS.DANGER || '#ef4444'}
+          delay={0.1}
         />
-        <AttendanceStatCard
-          icon={BarChart3}
+        <StatCard
+          icon={Clock}
           label="Classes Late"
-          value="2"
-          percentage="2"
-          color={COLORS.WARNING}
+          value={overall.late ?? 0}
+          sub={overall.total > 0 ? `${Math.round((overall.late / overall.total) * 100)}% late rate` : '—'}
+          color={COLORS.WARNING || '#f59e0b'}
+          delay={0.15}
         />
-      </motion.div>
-
-      {/* Calendar */}
-      <div className="mb-8">
-        <AttendanceCalendar />
       </div>
 
-      {/* Subject Attendance and Policy */}
+      {/* Calendar Heatmap */}
+      <div className="mb-8">
+        <AttendanceCalendar records={records} />
+      </div>
+
+      {/* Subject breakdown + Policy */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <SubjectAttendance />
+          <CourseBreakdown courses={byCourse} />
         </div>
         <div>
-          <AttendancePolicy />
+          <AttendancePolicy overallPct={overallPct} />
         </div>
       </div>
     </div>
