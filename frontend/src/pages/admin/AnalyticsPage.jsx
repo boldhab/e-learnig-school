@@ -1,48 +1,68 @@
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from 'recharts';
 import { TrendingUp, Users, BookOpen, Activity } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { ADMIN_COLORS } from '../../constants/adminTheme';
 import { AdminCard, AdminMetricCard, AdminSection } from '../../components/admin/AdminUI';
-
-const growthData = [
-  { month: 'Jan', students: 1080, teachers: 78 },
-  { month: 'Feb', students: 1110, teachers: 79 },
-  { month: 'Mar', students: 1145, teachers: 81 },
-  { month: 'Apr', students: 1190, teachers: 82 },
-  { month: 'May', students: 1248, teachers: 84 },
-];
-
-const attendanceTrend = [
-  { week: 'W1', rate: 90 },
-  { week: 'W2', rate: 92 },
-  { week: 'W3', rate: 91 },
-  { week: 'W4', rate: 94 },
-  { week: 'W5', rate: 95 },
-];
-
-const assignmentCompletion = [
-  { name: 'Submitted', value: 74 },
-  { name: 'Pending', value: 18 },
-  { name: 'Overdue', value: 8 },
-];
-
-const engagementData = [
-  { label: 'Teacher Posts', value: 85 },
-  { label: 'Material Views', value: 92 },
-  { label: 'Quiz Attempts', value: 71 },
-  { label: 'Live Attendance', value: 88 },
-];
+import adminApi from '../../api/modules/admin.api';
 
 const COLORS = ['#1E40AF', '#0F766E', '#F59E0B'];
 
-const AnalyticsPage = () => (
-  <div className="space-y-6">
-    <AdminSection title="Performance Analytics" description="Enterprise-level analytics for growth, engagement, attendance, and system usage.">
-      <div className="grid gap-4 md:grid-cols-4">
-        <AdminMetricCard title="Student Growth" value="+8.4%" trend="YoY" icon={TrendingUp} />
-        <AdminMetricCard title="Attendance Trend" value="94%" trend="Stable" icon={Users} />
-        <AdminMetricCard title="Completion Rate" value="92%" trend="+3.1%" icon={BookOpen} />
-        <AdminMetricCard title="System Usage" value="High" trend="Active" icon={Activity} />
-      </div>
+const AnalyticsPage = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [metrics, setMetrics] = useState({
+    student_growth: 0,
+    attendance_trend: 0,
+    completion_rate: 0,
+    system_usage: 'Low',
+  });
+  const [growthData, setGrowthData] = useState([]);
+  const [attendanceTrend, setAttendanceTrend] = useState([]);
+  const [assignmentCompletion, setAssignmentCompletion] = useState([]);
+  const [engagementData, setEngagementData] = useState([]);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await adminApi.getPerformanceAnalytics();
+        const data = response.data?.data || response.data || {};
+
+        if (data && data.metrics) {
+          setMetrics((prev) => ({ ...prev, ...(data.metrics || {}) }));
+          setGrowthData(data.growth_data || []);
+          setAttendanceTrend(data.attendance_trend_data || []);
+          setAssignmentCompletion(data.assignment_completion || []);
+          setEngagementData(data.engagement_data || []);
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to load performance analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, []);
+
+  if (loading) {
+    return <div className="py-8 text-sm text-slate-600">Loading performance analytics...</div>;
+  }
+
+  if (error) {
+    return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Error: {error}</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <AdminSection title="Performance Analytics" description="Enterprise-level analytics for growth, engagement, attendance, and system usage.">
+        <div className="grid gap-4 md:grid-cols-4">
+          <AdminMetricCard title="Student Growth" value={`${metrics.student_growth >= 0 ? '+' : ''}${metrics.student_growth}%`} trend="30d" icon={TrendingUp} />
+          <AdminMetricCard title="Attendance Trend" value={`${metrics.attendance_trend}%`} trend="Current" icon={Users} />
+          <AdminMetricCard title="Completion Rate" value={`${metrics.completion_rate}%`} trend="Graded" icon={BookOpen} />
+          <AdminMetricCard title="System Usage" value={metrics.system_usage} trend="Last 7 days" icon={Activity} />
+        </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <AdminCard className="p-5">
@@ -108,8 +128,9 @@ const AnalyticsPage = () => (
           </div>
         </AdminCard>
       </div>
-    </AdminSection>
-  </div>
-);
+      </AdminSection>
+    </div>
+  );
+};
 
 export default AnalyticsPage;

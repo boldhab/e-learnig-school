@@ -46,6 +46,7 @@ $router->post('/api/admin/assign-teacher', [AdminController::class, 'assignTeach
 $router->get('/api/admin/teachers/{id}/assignments', [AdminController::class, 'getTeacherAssignments']);
 $router->get('/api/admin/stats', [AdminController::class, 'getStats']);
 $router->get('/api/admin/logs', [AdminController::class, 'getLogs']);
+$router->get('/api/admin/logs/detailed', [AdminController::class, 'getDetailedLogs']);
 $router->get('/api/admin/classes', [AdminController::class, 'getClasses']);
 $router->get('/api/admin/courses', [AdminController::class, 'getCourses']);
 $router->get('/api/admin/courses/overview', [AdminController::class, 'getCoursesOverview']);
@@ -53,6 +54,7 @@ $router->get('/api/admin/courses/{id}/details', [AdminController::class, 'getCou
 $router->get('/api/admin/assignments/overview', [AdminController::class, 'getAssignmentsOverview']);
 $router->get('/api/admin/discussions/monitoring', [AdminController::class, 'getDiscussionsMonitoring']);
 $router->get('/api/admin/attendance/reports', [AdminController::class, 'getAttendanceReports']);
+$router->get('/api/admin/performance/analytics', [AdminController::class, 'getPerformanceAnalytics']);
 $router->post('/api/admin/users/update', [AdminController::class, 'updateUser']);
 $router->post('/api/admin/users/delete', [AdminController::class, 'deleteUser']);
 $router->post('/api/admin/users/reset-password', [AdminController::class, 'resetPassword']);

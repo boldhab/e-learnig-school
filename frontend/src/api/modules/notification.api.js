@@ -1,10 +1,10 @@
 import api from '../axios.config';
 
 const notificationApi = {
-  getNotifications: () => api.get('/notifications'),
-  getUnreadCount: () => api.get('/notifications/unread-count'),
-  markAsRead: (id) => api.put(`/notifications/${id}/read`),
-  markAllAsRead: () => api.put('/notifications/read-all'),
+  getNotifications: () => api.get('notifications'),
+  getUnreadCount: () => api.get('notifications/unread-count'),
+  markAsRead: (id) => api.put(`notifications/${id}/read`),
+  markAllAsRead: () => api.put('notifications/read-all'),
 };
 
 export default notificationApi;

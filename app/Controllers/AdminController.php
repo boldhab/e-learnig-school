@@ -187,6 +187,131 @@ class AdminController extends BaseController {
         }
     }
 
+    public function getDetailedLogs(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+            $params = $request->getBody();
+
+            $limit = isset($params['limit']) ? (int) $params['limit'] : 100;
+            if ($limit <= 0) {
+                $limit = 100;
+            }
+            if ($limit > 250) {
+                $limit = 250;
+            }
+
+            $logs = [];
+
+            $loginStmt = $db->prepare(" 
+                SELECT
+                    l.login_time AS timestamp,
+                    u.full_name AS user,
+                    'User login' AS action,
+                    'Authentication' AS module,
+                    l.ip_address AS ip,
+                    'Success' AS status
+                FROM login_logs l
+                INNER JOIN users u ON u.id = l.user_id
+                ORDER BY l.login_time DESC
+                LIMIT ?
+            ");
+            $loginStmt->bindValue(1, $limit, \PDO::PARAM_INT);
+            $loginStmt->execute();
+            $logs = array_merge($logs, $loginStmt->fetchAll());
+
+            $userCreateStmt = $db->prepare(" 
+                SELECT
+                    u.created_at AS timestamp,
+                    'System' AS user,
+                    CONCAT('Created user account: ', u.full_name) AS action,
+                    'User Management' AS module,
+                    NULL AS ip,
+                    'Success' AS status
+                FROM users u
+                ORDER BY u.created_at DESC
+                LIMIT ?
+            ");
+            $userCreateStmt->bindValue(1, $limit, \PDO::PARAM_INT);
+            $userCreateStmt->execute();
+            $logs = array_merge($logs, $userCreateStmt->fetchAll());
+
+            $materialStmt = $db->prepare(" 
+                SELECT
+                    m.created_at AS timestamp,
+                    u.full_name AS user,
+                    CONCAT('Uploaded material: ', m.title) AS action,
+                    'Materials' AS module,
+                    NULL AS ip,
+                    'Success' AS status
+                FROM materials m
+                INNER JOIN users u ON u.id = m.uploaded_by
+                ORDER BY m.created_at DESC
+                LIMIT ?
+            ");
+            $materialStmt->bindValue(1, $limit, \PDO::PARAM_INT);
+            $materialStmt->execute();
+            $logs = array_merge($logs, $materialStmt->fetchAll());
+
+            $assignmentStmt = $db->prepare(" 
+                SELECT
+                    a.created_at AS timestamp,
+                    u.full_name AS user,
+                    CONCAT('Created assignment: ', a.title) AS action,
+                    'Assignments' AS module,
+                    NULL AS ip,
+                    'Success' AS status
+                FROM assignments a
+                INNER JOIN users u ON u.id = a.created_by
+                ORDER BY a.created_at DESC
+                LIMIT ?
+            ");
+            $assignmentStmt->bindValue(1, $limit, \PDO::PARAM_INT);
+            $assignmentStmt->execute();
+            $logs = array_merge($logs, $assignmentStmt->fetchAll());
+
+            $warningStmt = $db->prepare(" 
+                SELECT
+                    n.created_at AS timestamp,
+                    u.full_name AS user,
+                    n.title AS action,
+                    'Notifications' AS module,
+                    NULL AS ip,
+                    'Warning' AS status
+                FROM notifications n
+                INNER JOIN users u ON u.id = n.user_id
+                WHERE n.priority = 'high' OR n.type = 'warning'
+                ORDER BY n.created_at DESC
+                LIMIT ?
+            ");
+            $warningStmt->bindValue(1, $limit, \PDO::PARAM_INT);
+            $warningStmt->execute();
+            $logs = array_merge($logs, $warningStmt->fetchAll());
+
+            usort($logs, function ($a, $b) {
+                return strtotime($b['timestamp']) - strtotime($a['timestamp']);
+            });
+
+            $logs = array_slice($logs, 0, $limit);
+
+            $formatted = array_map(function ($log) {
+                return [
+                    'timestamp' => $log['timestamp'],
+                    'user' => $log['user'] ?: 'Unknown',
+                    'action' => $log['action'] ?: 'Activity',
+                    'module' => $log['module'] ?: 'System',
+                    'ip' => $log['ip'] ?: '-',
+                    'status' => $log['status'] ?: 'Success',
+                ];
+            }, $logs);
+
+            $this->success($formatted);
+        } catch (Exception $e) {
+            $this->error($e->getMessage(), 400);
+        }
+    }
+
     public function getClasses(Request $request, Response $response) {
         $this->requireRole('ADMIN');
         try {
@@ -941,6 +1066,157 @@ class AdminController extends BaseController {
                         'rate' => (int) ($data['rate'] ?? 0),
                     ];
                 }, $subjectData),
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    public function getPerformanceAnalytics(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $db = \App\Core\Database::getInstance();
+
+            $currentStudentsStmt = $db->query("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'STUDENT'");
+            $currentStudents = (int) $currentStudentsStmt->fetchColumn();
+
+            $previousStudentsStmt = $db->query("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'STUDENT' AND u.created_at < DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+            $previousStudents = (int) $previousStudentsStmt->fetchColumn();
+
+            $studentGrowth = $previousStudents > 0
+                ? round((($currentStudents - $previousStudents) / $previousStudents) * 100, 1)
+                : 0.0;
+
+            $attendanceTrendStmt = $db->query("SELECT ROUND((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 0) FROM attendance_records WHERE attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+            $attendanceTrend = (int) ($attendanceTrendStmt->fetchColumn() ?: 0);
+
+            $completionStmt = $db->query("SELECT ROUND((SUM(CASE WHEN status = 'graded' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 0) FROM submissions");
+            $completionRate = (int) ($completionStmt->fetchColumn() ?: 0);
+
+            $systemUsageStmt = $db->query("SELECT COUNT(*) FROM login_logs WHERE login_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $systemLogins = (int) $systemUsageStmt->fetchColumn();
+            $systemUsageLevel = $systemLogins > 200 ? 'High' : ($systemLogins > 80 ? 'Medium' : 'Low');
+
+            $growthStmt = $db->query("
+                SELECT
+                    DATE_FORMAT(month_ref, '%b') AS month,
+                    SUM(students_count) AS students,
+                    SUM(teachers_count) AS teachers
+                FROM (
+                    SELECT
+                        DATE_FORMAT(u.created_at, '%Y-%m-01') AS month_ref,
+                        SUM(CASE WHEN r.role_name = 'STUDENT' THEN 1 ELSE 0 END) AS students_count,
+                        SUM(CASE WHEN r.role_name = 'TEACHER' THEN 1 ELSE 0 END) AS teachers_count
+                    FROM users u
+                    INNER JOIN roles r ON r.id = u.role_id
+                    WHERE u.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+                    GROUP BY DATE_FORMAT(u.created_at, '%Y-%m-01')
+                ) monthly
+                GROUP BY month_ref
+                ORDER BY month_ref ASC
+                LIMIT 6
+            ");
+            $growthData = $growthStmt->fetchAll();
+
+            $attendanceWeeklyStmt = $db->query("
+                SELECT
+                    CONCAT('W', WEEK(attendance_date, 1)) AS week,
+                    ROUND((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 0) AS rate,
+                    MAX(attendance_date) AS latest_day
+                FROM attendance_records
+                WHERE attendance_date >= DATE_SUB(CURDATE(), INTERVAL 35 DAY)
+                GROUP BY YEAR(attendance_date), WEEK(attendance_date, 1)
+                ORDER BY latest_day ASC
+                LIMIT 5
+            ");
+            $attendanceWeekly = $attendanceWeeklyStmt->fetchAll();
+
+            $assignmentCompletionStmt = $db->query("
+                SELECT
+                    SUM(CASE WHEN status = 'graded' THEN 1 ELSE 0 END) AS submitted_count,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) AS overdue_count
+                FROM submissions
+            ");
+            $assignmentCompletion = $assignmentCompletionStmt->fetch();
+
+            $teacherPostsStmt = $db->query("
+                SELECT
+                    COUNT(DISTINCT dt.created_by) AS active_teachers,
+                    (SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'TEACHER') AS total_teachers
+                FROM discussion_topics dt
+                INNER JOIN users u ON u.id = dt.created_by
+                INNER JOIN roles r ON r.id = u.role_id
+                WHERE r.role_name = 'TEACHER'
+                AND dt.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ");
+            $teacherPosts = $teacherPostsStmt->fetch();
+
+            $materialsUsageStmt = $db->query("
+                SELECT
+                    COUNT(DISTINCT m.uploaded_by) AS active_uploaders,
+                    (SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'TEACHER') AS total_teachers
+                FROM materials m
+                WHERE m.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ");
+            $materialsUsage = $materialsUsageStmt->fetch();
+
+            $quizAttemptsStmt = $db->query("
+                SELECT
+                    COUNT(DISTINCT s.student_id) AS students_submitted,
+                    (SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'STUDENT') AS total_students
+                FROM submissions s
+                WHERE s.submitted_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ");
+            $quizAttempts = $quizAttemptsStmt->fetch();
+
+            $liveAttendanceStmt = $db->query("SELECT ROUND((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 0) AS live_rate FROM attendance_records WHERE attendance_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+            $liveAttendance = (int) (($liveAttendanceStmt->fetch()['live_rate'] ?? 0));
+
+            $teacherPostsPct = ((int) ($teacherPosts['total_teachers'] ?? 0)) > 0
+                ? (int) round((((int) ($teacherPosts['active_teachers'] ?? 0)) / ((int) $teacherPosts['total_teachers'])) * 100)
+                : 0;
+
+            $materialsUsagePct = ((int) ($materialsUsage['total_teachers'] ?? 0)) > 0
+                ? (int) round((((int) ($materialsUsage['active_uploaders'] ?? 0)) / ((int) $materialsUsage['total_teachers'])) * 100)
+                : 0;
+
+            $quizAttemptsPct = ((int) ($quizAttempts['total_students'] ?? 0)) > 0
+                ? (int) round((((int) ($quizAttempts['students_submitted'] ?? 0)) / ((int) $quizAttempts['total_students'])) * 100)
+                : 0;
+
+            $this->success([
+                'metrics' => [
+                    'student_growth' => $studentGrowth,
+                    'attendance_trend' => $attendanceTrend,
+                    'completion_rate' => $completionRate,
+                    'system_usage' => $systemUsageLevel,
+                ],
+                'growth_data' => array_map(function ($row) {
+                    return [
+                        'month' => $row['month'],
+                        'students' => (int) ($row['students'] ?? 0),
+                        'teachers' => (int) ($row['teachers'] ?? 0),
+                    ];
+                }, $growthData),
+                'attendance_trend_data' => array_map(function ($row) {
+                    return [
+                        'week' => $row['week'],
+                        'rate' => (int) ($row['rate'] ?? 0),
+                    ];
+                }, $attendanceWeekly),
+                'assignment_completion' => [
+                    ['name' => 'Submitted', 'value' => (int) ($assignmentCompletion['submitted_count'] ?? 0)],
+                    ['name' => 'Pending', 'value' => (int) ($assignmentCompletion['pending_count'] ?? 0)],
+                    ['name' => 'Overdue', 'value' => (int) ($assignmentCompletion['overdue_count'] ?? 0)],
+                ],
+                'engagement_data' => [
+                    ['label' => 'Teacher Posts', 'value' => $teacherPostsPct],
+                    ['label' => 'Material Views', 'value' => $materialsUsagePct],
+                    ['label' => 'Quiz Attempts', 'value' => $quizAttemptsPct],
+                    ['label' => 'Live Attendance', 'value' => $liveAttendance],
+                ],
             ]);
         } catch (Exception $e) {
             $this->error($e->getMessage());
