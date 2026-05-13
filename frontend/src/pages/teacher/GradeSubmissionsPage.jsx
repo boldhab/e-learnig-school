@@ -28,6 +28,13 @@ const GradeSubmissionsPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
+    if (!id) {
+      setAssignment(null);
+      setSubmissions([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const [assignmentRes, submissionsRes] = await Promise.all([
         assignmentApi.getAssignmentDetails(id),
@@ -74,6 +81,28 @@ const GradeSubmissionsPage = () => {
     return (
       <div className="h-screen flex items-center justify-center">
         <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  if (!id) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <div className="bg-slate-50 rounded-3xl border border-dashed p-12 text-center">
+          <Trophy size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Choose an assignment first</h1>
+          <p className="text-slate-500 mb-6">
+            This grading page needs a specific assignment before submissions can be loaded.
+          </p>
+          <button
+            onClick={() => navigate('/teacher/assignments')}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white"
+            style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
+          >
+            <ArrowLeft size={18} />
+            Go to Assignments
+          </button>
+        </div>
       </div>
     );
   }

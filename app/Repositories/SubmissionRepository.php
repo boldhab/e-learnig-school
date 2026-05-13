@@ -39,11 +39,20 @@ class SubmissionRepository {
     }
 
     public function getByStudent($studentId) {
-        $sql = "SELECT s.*, a.title as assignment_title, g.marks, g.published_at 
+        $sql = "SELECT s.*,
+                       a.title,
+                       a.title as assignment_title,
+                       a.max_marks,
+                       c.name as course_name,
+                       g.marks,
+                       g.feedback,
+                       g.published_at
                 FROM submissions s 
                 JOIN assignments a ON s.assignment_id = a.id 
+                LEFT JOIN categories c ON a.course_id = c.id
                 LEFT JOIN grades g ON s.id = g.submission_id 
-                WHERE s.student_id = :student_id";
+                WHERE s.student_id = :student_id
+                ORDER BY COALESCE(s.submitted_at, s.created_at) DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['student_id' => $studentId]);
         return $stmt->fetchAll();

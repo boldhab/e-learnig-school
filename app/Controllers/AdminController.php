@@ -1601,7 +1601,9 @@ class AdminController extends BaseController {
                     'id' => (int) $t['id'],
                     'title' => $t['title'] ?? 'Unnamed Discussion',
                     'author' => $t['author'] ?? 'Unknown',
+                    'group_title' => $t['group_title'] ?? 'Unknown Group',
                     'status' => $t['status'] === 'closed' ? 'Flagged' : ($t['status'] === 'open' ? 'Clean' : 'Moderate'),
+                    'raw_status' => $t['status'],
                     'replies' => (int) $t['message_count'],
                     'last_activity' => $t['created_at'],
                 ];

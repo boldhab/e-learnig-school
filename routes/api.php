@@ -114,6 +114,7 @@ $router->post('/api/discussions/groups/{id}/topics', [\App\Controllers\Discussio
 $router->get('/api/discussions/topics/{id}/messages', [\App\Controllers\DiscussionController::class, 'listMessages']);
 $router->post('/api/discussions/topics/{id}/messages', [\App\Controllers\DiscussionController::class, 'postMessage']);
 $router->delete('/api/discussions/messages/{id}', [\App\Controllers\DiscussionController::class, 'deleteMessage']);
+$router->delete('/api/discussions/topics/{id}', [\App\Controllers\DiscussionController::class, 'deleteTopic']);
 
 // Performance & Analytics Routes
 $router->get('/api/performance/student/stats', [\App\Controllers\PerformanceController::class, 'getStudentDashboardStats']);

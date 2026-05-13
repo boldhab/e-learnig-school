@@ -39,9 +39,7 @@ class DiscussionService {
 
     public function getUserGroups($userId, $role, $classId = null) {
         if ($role === 'ADMIN') {
-            // Admin could see all, but let's keep it clean for now
-            // Maybe just return all groups or empty for admin dashboard
-            return []; 
+            return $this->groupRepo->getAllGroups();
         }
 
         if ($role === 'TEACHER') {
@@ -107,5 +105,14 @@ class DiscussionService {
 
     public function updateTopicStatus($topicId, $status) {
         return $this->topicRepo->updateStatus($topicId, $status);
+    }
+
+    public function deleteTopic($topicId) {
+        $topic = $this->topicRepo->findById($topicId);
+        if (!$topic) {
+            throw new Exception("Topic not found.");
+        }
+
+        return $this->topicRepo->delete($topicId);
     }
 }

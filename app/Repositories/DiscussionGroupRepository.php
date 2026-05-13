@@ -34,8 +34,17 @@ class DiscussionGroupRepository {
         return $stmt->fetch();
     }
 
+    public function getAllGroups() {
+        $sql = "SELECT dg.*, c.name AS course_name
+                FROM discussion_groups dg
+                LEFT JOIN categories c ON c.id = dg.course_id
+                ORDER BY dg.created_at DESC";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll();
+    }
+
     public function getGroupsByStudent($classId) {
-        $sql = "SELECT dg.* FROM discussion_groups dg
+        $sql = "SELECT DISTINCT dg.* FROM discussion_groups dg
                 JOIN teacher_assignments ta ON dg.course_id = ta.course_id
                 WHERE ta.class_id = :class_id";
         $stmt = $this->db->prepare($sql);
@@ -44,7 +53,7 @@ class DiscussionGroupRepository {
     }
 
     public function getGroupsByTeacher($teacherId) {
-        $sql = "SELECT dg.* FROM discussion_groups dg
+        $sql = "SELECT DISTINCT dg.* FROM discussion_groups dg
                 JOIN teacher_assignments ta ON dg.course_id = ta.course_id
                 WHERE ta.teacher_id = :teacher_id";
         $stmt = $this->db->prepare($sql);

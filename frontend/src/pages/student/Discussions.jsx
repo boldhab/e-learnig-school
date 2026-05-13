@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MessageCircle, ThumbsUp, Reply, Send, User, Loader2, ChevronRight, Wifi, WifiOff } from 'lucide-react';
+import { Search, MessageCircle, Reply, Send, Loader2, ChevronRight, Wifi, WifiOff, PlusCircle } from 'lucide-react';
 import { COLORS } from '../../constants/theme';
 import communicationApi from '../../api/modules/communication.api';
 import { useDiscussionSocket } from '../../hooks/useDiscussionSocket';
@@ -267,6 +267,8 @@ const DiscussionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [newTopicTitle, setNewTopicTitle] = useState('');
+  const [creatingTopic, setCreatingTopic] = useState(false);
 
   // Monitor connection
   useEffect(() => {
@@ -306,14 +308,35 @@ const DiscussionsPage = () => {
       try {
         const response = await communicationApi.getTopics(selectedGroup.id);
         const data = response.data?.data ?? response.data ?? [];
-        setTopics(Array.isArray(data) ? data : []);
-        setActiveTopic(null); // Reset active topic when group changes
+        const nextTopics = Array.isArray(data) ? data : [];
+        setTopics(nextTopics);
+        setActiveTopic(nextTopics[0] ?? null);
       } catch (error) {
         console.error("Failed to fetch topics:", error);
       }
     };
     fetchTopics();
   }, [selectedGroup]);
+
+  const handleCreateTopic = async () => {
+    if (!selectedGroup || !newTopicTitle.trim()) return;
+
+    setCreatingTopic(true);
+    try {
+      await communicationApi.createTopic(selectedGroup.id, { title: newTopicTitle.trim() });
+      const response = await communicationApi.getTopics(selectedGroup.id);
+      const data = response.data?.data ?? response.data ?? [];
+      const nextTopics = Array.isArray(data) ? data : [];
+      setTopics(nextTopics);
+      setActiveTopic(nextTopics[0] ?? null);
+      setNewTopicTitle('');
+    } catch (error) {
+      console.error("Failed to create topic:", error);
+      alert(error.response?.data?.message || "Failed to create topic.");
+    } finally {
+      setCreatingTopic(false);
+    }
+  };
 
   const filteredTopics = Array.isArray(topics) ? topics.filter((t) =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -378,6 +401,36 @@ const DiscussionsPage = () => {
 
             {/* Topics List */}
             <section className="bg-white rounded-2xl border p-4 shadow-sm" style={{ borderColor: COLORS.BORDER }}>
+              <div className="mb-4 rounded-xl bg-slate-50 p-3">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">
+                  Start a topic
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTopicTitle}
+                    onChange={(e) => setNewTopicTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateTopic();
+                      }
+                    }}
+                    placeholder="Ask a question or start a discussion..."
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateTopic}
+                    disabled={creatingTopic || !newTopicTitle.trim() || !selectedGroup}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {creatingTopic ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
+                    Topic
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-slate-900">Topics</h2>
                 <div className="relative">

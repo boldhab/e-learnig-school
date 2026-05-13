@@ -11,6 +11,7 @@ import TeacherAttendance from '../pages/teacher/Attendance';
 import UploadMaterialPage from '../pages/teacher/UploadMaterialPage';
 import GradeSubmissionsPage from '../pages/teacher/GradeSubmissionsPage';
 import CreateAssignmentPage from '../pages/teacher/CreateAssignmentPage';
+import DiscussionManagementPage from '../pages/teacher/DiscussionManagementPage';
 
 const TeacherRoutes = () => {
   return (
@@ -22,9 +23,11 @@ const TeacherRoutes = () => {
         <Route path="courses/:courseId" element={<TeacherCourseDetails />} />
         <Route path="materials"    element={<TeacherMaterials />} />
         <Route path="assignments"  element={<TeacherAssignments />} />
+        <Route path="submissions"  element={<Navigate to="/teacher/assignments" replace />} />
         <Route path="grading"      element={<TeacherGrading />} />
         <Route path="analytics"    element={<TeacherAnalytics />} />
         <Route path="attendance"   element={<TeacherAttendance />} />
+        <Route path="discussions"  element={<DiscussionManagementPage />} />
         <Route path="materials/upload" element={<UploadMaterialPage />} />
         <Route path="assignments/create" element={<CreateAssignmentPage />} />
         <Route path="assignments/:id/grade" element={<GradeSubmissionsPage />} />

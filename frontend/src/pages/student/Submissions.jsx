@@ -83,10 +83,10 @@ const SubmissionsPage = () => {
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <h2 className="text-xl font-bold" style={{ color: COLORS.TEXT_PRIMARY }}>
-                      {submission.title}
+                      {submission.title || submission.assignment_title}
                     </h2>
                     <p className="text-sm text-gray-500 mt-1">
-                      Submitted {new Date(submission.created_at).toLocaleString()}
+                      Submitted {new Date(submission.submitted_at || submission.created_at).toLocaleString()}
                     </p>
                   </div>
                   <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${tone}`}>

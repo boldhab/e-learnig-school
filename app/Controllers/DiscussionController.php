@@ -42,7 +42,7 @@ class DiscussionController extends BaseController {
     }
 
     public function createTopic(Request $request, Response $response, $groupId) {
-        $this->requireRole(['ADMIN', 'TEACHER']);
+        $this->requireAuth();
         $data = HtmlSanitizer::sanitize($request->getBody());
         $data['group_id'] = $groupId;
         $data['created_by'] = $GLOBALS['auth_user']['id'];
@@ -98,6 +98,16 @@ class DiscussionController extends BaseController {
             $this->success([], 'Message deleted by moderator');
         } catch (Exception $e) {
             $this->error($e->getMessage());
+        }
+    }
+
+    public function deleteTopic(Request $request, Response $response, $topicId) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
+        try {
+            $this->discussionService->deleteTopic($topicId);
+            $this->success([], 'Topic deleted successfully');
+        } catch (Exception $e) {
+            $this->error($e->getMessage(), 404);
         }
     }
 

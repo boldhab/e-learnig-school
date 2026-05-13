@@ -12,6 +12,8 @@ const communicationApi = {
   sendMessage: (topicId, data) => api.post(`discussions/topics/${topicId}/messages`, data),
   
   deleteMessage: (messageId) => api.delete(`discussions/messages/${messageId}`),
+
+  deleteTopic: (topicId) => api.delete(`discussions/topics/${topicId}`),
   
   updateTopicStatus: (topicId, status) => api.post(`discussions/topics/${topicId}/${status}`)
 };
