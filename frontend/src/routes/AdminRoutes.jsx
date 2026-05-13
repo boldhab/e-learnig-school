@@ -35,7 +35,7 @@ const AdminRoutes = () => (
       <Route path="backups" element={<BackupPage />} />
       <Route path="activity-logs" element={<ActivityLogsPage />} />
       <Route path="profile" element={<ProfilePage />} />
-      <Route path="*" element={<Navigate to="dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   </AdminMainLayout>
 );

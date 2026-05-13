@@ -7,6 +7,7 @@ import TeacherMaterials from '../pages/teacher/Materials';
 import TeacherAssignments from '../pages/teacher/Assignments';
 import TeacherGrading from '../pages/teacher/Grading';
 import TeacherAnalytics from '../pages/teacher/Analytics';
+import TeacherAttendance from '../pages/teacher/Attendance';
 import UploadMaterialPage from '../pages/teacher/UploadMaterialPage';
 import GradeSubmissionsPage from '../pages/teacher/GradeSubmissionsPage';
 import CreateAssignmentPage from '../pages/teacher/CreateAssignmentPage';
@@ -23,11 +24,12 @@ const TeacherRoutes = () => {
         <Route path="assignments"  element={<TeacherAssignments />} />
         <Route path="grading"      element={<TeacherGrading />} />
         <Route path="analytics"    element={<TeacherAnalytics />} />
+        <Route path="attendance"   element={<TeacherAttendance />} />
         <Route path="materials/upload" element={<UploadMaterialPage />} />
         <Route path="assignments/create" element={<CreateAssignmentPage />} />
         <Route path="assignments/:id/grade" element={<GradeSubmissionsPage />} />
-        {/* Catch-all → default teacher page */}
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        {/* Catch-all → default teacher page with absolute path */}
+        <Route path="*" element={<Navigate to="/teacher/dashboard" replace />} />
       </Routes>
     </TeacherMainLayout>
   );

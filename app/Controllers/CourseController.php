@@ -18,7 +18,7 @@ class CourseController extends BaseController {
     public function list(Request $request, Response $response) {
         $this->requireAuth();
         $user = $GLOBALS['auth_user'];
-        $courses = $this->courseService->getUserCourses($user['id'], $user['role_name']);
+        $courses = $this->courseService->getUserCourses((int)($user['id'] ?? $user['user_id'] ?? 0), $user['role'] ?? '');
         $this->success($courses);
     }
 

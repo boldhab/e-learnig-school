@@ -21,21 +21,26 @@ class RouterService {
         $this->routes['delete'][$path] = $callback;
     }
     public function resolve() {
-        $path = $this->request->getPath();
-        $method = $this->request->getMethod();
-        foreach ($this->routes[$method] ?? [] as $routePath => $callback) {
-            $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<\1>[^/]+)', $routePath);
-            $pattern = "#^" . $pattern . "$#";
-            if (preg_match($pattern, $path, $matches)) {
-                $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
-                if (is_array($callback)) {
-                    $controller = new $callback[0]();
-                    $methodName = $callback[1];
-                    return $controller->$methodName($this->request, $this->response, ...array_values($params));
+        try {
+            $path = $this->request->getPath();
+            $method = $this->request->getMethod();
+            foreach ($this->routes[$method] ?? [] as $routePath => $callback) {
+                $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<\1>[^/]+)', $routePath);
+                $pattern = "#^" . $pattern . "$#";
+                if (preg_match($pattern, $path, $matches)) {
+                    $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
+                    if (is_array($callback)) {
+                        $controller = new $callback[0]();
+                        $methodName = $callback[1];
+                        return $controller->$methodName($this->request, $this->response, ...array_values($params));
+                    }
+                    return call_user_func($callback, $this->request, $this->response, ...array_values($params));
                 }
-                return call_user_func($callback, $this->request, $this->response, ...array_values($params));
             }
+            $this->response->json([], 'error', 'Route not found', 404);
+        } catch (\Throwable $e) {
+            error_log('Router error: ' . $e->getMessage() . ' - ' . $e->getFile() . ':' . $e->getLine());
+            $this->response->json([], 'error', 'Internal server error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine(), 500);
         }
-        $this->response->json([], 'error', 'Route not found', 404);
     }
 }

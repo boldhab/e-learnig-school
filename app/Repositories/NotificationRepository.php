@@ -13,6 +13,10 @@ class NotificationRepository {
     }
 
     public function create(array $data): int {
+        if (!isset($data['user_id']) || !isset($data['type']) || !isset($data['title']) || !isset($data['message'])) {
+            throw new \Exception('Missing required fields for notification');
+        }
+        
         $sql = "INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id, priority) 
                 VALUES (:user_id, :type, :title, :message, :reference_type, :reference_id, :priority)";
         
@@ -42,7 +46,7 @@ class NotificationRepository {
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getUnreadCount(int $userId): int {

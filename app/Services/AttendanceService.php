@@ -91,6 +91,13 @@ class AttendanceService {
         ];
     }
 
+    /**
+     * Validate that a teacher is assigned to a course.
+     */
+    public function validateTeacherCourseAssignment(int $teacherId, int $courseId): bool {
+        return $this->attendanceRepository->isTeacherAssignedToCourse($teacherId, $courseId);
+    }
+
     public function getStudentAttendance(int $studentId, ?int $courseId = null): array {
         return $this->attendanceRepository->getStudentAttendance($studentId, $courseId);
     }
@@ -101,6 +108,27 @@ class AttendanceService {
 
     public function getCourseAttendance(int $courseId, string $date): array {
         return $this->attendanceRepository->getCourseAttendance($courseId, $date);
+    }
+
+    /**
+     * Get monthly attendance report for a course.
+     */
+    public function getMonthlyReport(int $courseId, string $month): array {
+        return $this->attendanceRepository->getMonthlyReport($courseId, $month);
+    }
+
+    /**
+     * Get summary statistics for a course.
+     */
+    public function getCourseSummary(int $courseId): array {
+        return $this->attendanceRepository->getCourseSummary($courseId);
+    }
+
+    /**
+     * Get student-wise attendance stats for a course.
+     */
+    public function getStudentStatsForCourse(int $courseId): array {
+        return $this->attendanceRepository->getStudentStatsForCourse($courseId);
     }
 
     /**

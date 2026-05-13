@@ -13,8 +13,8 @@ class NotificationEvent implements BroadcastableEvent {
         $this->data = $data;
     }
 
-    public function broadcastOn(): array {
-        return ["private-user-{$this->userId}"];
+    public function broadcastOn(): string {
+        return "private-user-{$this->userId}";
     }
 
     public function broadcastAs(): string {

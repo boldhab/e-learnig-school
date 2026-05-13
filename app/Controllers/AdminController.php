@@ -1742,6 +1742,169 @@ class AdminController extends BaseController {
         }
     }
 
+    /**
+     * GET /api/admin/attendance/students-at-risk
+     * Get students with low attendance rates
+     */
+    public function getStudentsAtRisk(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $threshold = $_GET['threshold'] ?? 80; // Attendance percentage
+            $db = \App\Core\Database::getInstance();
+
+            $sql = "
+                SELECT
+                    u.id,
+                    u.full_name,
+                    u.email,
+                    u.student_code,
+                    COUNT(DISTINCT a.attendance_date) as total_classes,
+                    SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) as attended_classes,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as attendance_rate
+                FROM users u
+                LEFT JOIN attendance_records a ON u.id = a.student_id
+                WHERE u.role_id = (SELECT id FROM roles WHERE role_name = 'STUDENT')
+                GROUP BY u.id
+                HAVING attendance_rate < :threshold OR attendance_rate IS NULL
+                ORDER BY attendance_rate ASC
+                LIMIT 50
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['threshold' => (int)$threshold]);
+            $students = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $this->success($students);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    /**
+     * GET /api/admin/attendance/daily-summary
+     * Get daily attendance summary across institution
+     */
+    public function getDailyAttendanceSummary(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $date = $_GET['date'] ?? date('Y-m-d');
+            $db = \App\Core\Database::getInstance();
+
+            $sql = "
+                SELECT
+                    COUNT(DISTINCT student_id) as total_students_marked,
+                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count,
+                    SUM(CASE WHEN status = 'excused' THEN 1 ELSE 0 END) as excused_count,
+                    ROUND(
+                        (SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as overall_rate
+                FROM attendance_records
+                WHERE attendance_date = :date
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['date' => $date]);
+            $summary = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            // Get top absent students
+            $absenceStmt = $db->query("
+                SELECT
+                    u.full_name,
+                    u.email,
+                    c.name as course_name,
+                    a.remarks
+                FROM attendance_records a
+                JOIN users u ON a.student_id = u.id
+                JOIN categories c ON a.course_id = c.id
+                WHERE a.attendance_date = '{$date}' AND a.status = 'absent'
+                LIMIT 20
+            ");
+            $absentees = $absenceStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $this->success([
+                'date' => $date,
+                'summary' => $summary,
+                'absentees' => $absentees,
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    /**
+     * GET /api/admin/attendance/course-details?course_id=X
+     * Get detailed attendance info for a specific course
+     */
+    public function getAttendanceCourseDetails(Request $request, Response $response) {
+        $this->requireRole('ADMIN');
+
+        try {
+            $courseId = $_GET['course_id'] ?? null;
+            
+            if (!$courseId) {
+                return $this->error('Course ID required', 400);
+            }
+
+            $db = \App\Core\Database::getInstance();
+
+            // Course summary
+            $courseStmt = $db->prepare("
+                SELECT
+                    c.id,
+                    c.name,
+                    COUNT(DISTINCT a.student_id) as total_students_marked,
+                    COUNT(DISTINCT a.attendance_date) as class_days,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as total_present,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as total_late,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as avg_attendance_rate
+                FROM categories c
+                LEFT JOIN attendance_records a ON c.id = a.course_id
+                WHERE c.id = :course_id
+                GROUP BY c.id
+            ");
+            $courseStmt->execute(['course_id' => (int)$courseId]);
+            $courseSummary = $courseStmt->fetch(\PDO::FETCH_ASSOC);
+
+            // Student-wise breakdown
+            $studentsStmt = $db->prepare("
+                SELECT
+                    u.id,
+                    u.full_name,
+                    u.student_code,
+                    COUNT(*) as total_records,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as late_count,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as attendance_rate
+                FROM attendance_records a
+                JOIN users u ON a.student_id = u.id
+                WHERE a.course_id = :course_id
+                GROUP BY u.id
+                ORDER BY attendance_rate ASC
+            ");
+            $studentsStmt->execute(['course_id' => (int)$courseId]);
+            $studentDetails = $studentsStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $this->success([
+                'course' => $courseSummary,
+                'students' => $studentDetails,
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
     public function getPerformanceAnalytics(Request $request, Response $response) {
         $this->requireRole('ADMIN');
 

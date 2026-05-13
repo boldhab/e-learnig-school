@@ -20,6 +20,9 @@ class SseController {
      * Stream notifications to the client using Server-Sent Events.
      */
     public function stream(Request $request, Response $response) {
+        set_time_limit(0);
+        ignore_user_abort(true);
+
         // SSE Headers (set early so client doesn't see text/html on errors)
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
@@ -53,17 +56,24 @@ class SseController {
 
         $userId = $user['id'];
         $lastChecked = date('Y-m-d H:i:s');
+        $lastHeartbeatAt = time();
 
         // Infinite loop to keep the connection open
         while (true) {
-            // Check for new notifications in the database
-            $stmt = $this->db->prepare("
-                SELECT * FROM notifications 
-                WHERE user_id = ? AND created_at > ? 
-                ORDER BY created_at ASC
-            ");
-            $stmt->execute([$userId, $lastChecked]);
-            $newNotifications = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            try {
+                // Check for new notifications in the database
+                $stmt = $this->db->prepare("
+                    SELECT * FROM notifications 
+                    WHERE user_id = ? AND created_at > ? 
+                    ORDER BY created_at ASC
+                ");
+                $stmt->execute([$userId, $lastChecked]);
+                $newNotifications = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (\Throwable $e) {
+                header('HTTP/1.1 500 Internal Server Error');
+                $this->sendEvent('sse.error', ['message' => 'Notification stream lost database connection']);
+                break;
+            }
 
             if (!empty($newNotifications)) {
                 foreach ($newNotifications as $notification) {
@@ -73,8 +83,9 @@ class SseController {
             }
 
             // Send a heartbeat ping every 30 seconds to keep connection alive
-            if (time() % 30 === 0) {
+            if ((time() - $lastHeartbeatAt) >= 30) {
                 echo ": heartbeat\n\n";
+                $lastHeartbeatAt = time();
             }
 
             if (connection_aborted()) {

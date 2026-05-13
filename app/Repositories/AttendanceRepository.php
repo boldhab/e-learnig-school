@@ -181,4 +181,136 @@ class AttendanceRepository {
 
         return round(($result['attended_days'] / $result['total_days']) * 100, 2);
     }
+
+    /**
+     * Get monthly report for a course (attendance statistics for each month).
+     */
+    public function getMonthlyReport(int $courseId, string $month): array {
+        // Format: 'YYYY-MM'
+        $startDate = "$month-01";
+        $endDate = date('Y-m-t', strtotime($startDate));
+
+        $sql = "SELECT
+                    DATE_FORMAT(a.attendance_date, '%d') as day,
+                    a.attendance_date,
+                    COUNT(DISTINCT a.student_id) as total_students,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as late_count,
+                    SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) as excused_count
+                FROM attendance_records a
+                WHERE a.course_id = :course_id
+                  AND a.attendance_date BETWEEN :start_date AND :end_date
+                GROUP BY a.attendance_date
+                ORDER BY a.attendance_date ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'course_id' => $courseId,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $dailyRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Get overall monthly stats
+        $statsSql = "SELECT
+                    COUNT(DISTINCT a.student_id) as total_students,
+                    COUNT(DISTINCT a.attendance_date) as class_days,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as total_present,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as total_late,
+                    SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) as total_excused,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as avg_attendance_rate
+                FROM attendance_records a
+                WHERE a.course_id = :course_id
+                  AND a.attendance_date BETWEEN :start_date AND :end_date";
+
+        $statsStmt = $this->db->prepare($statsSql);
+        $statsStmt->execute([
+            'course_id' => $courseId,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ]);
+
+        $summary = $statsStmt->fetch(PDO::FETCH_ASSOC);
+
+        return [
+            'month' => $month,
+            'daily_records' => $dailyRecords,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Get overall summary for a course.
+     */
+    public function getCourseSummary(int $courseId): array {
+        $sql = "SELECT
+                    c.id,
+                    c.name,
+                    COUNT(DISTINCT a.student_id) as total_students,
+                    COUNT(DISTINCT a.attendance_date) as class_days,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as total_present,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as total_late,
+                    SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) as total_excused,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as avg_attendance_rate
+                FROM categories c
+                LEFT JOIN attendance_records a ON c.id = a.course_id
+                WHERE c.id = :course_id
+                GROUP BY c.id";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['course_id' => $courseId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?? [];
+    }
+
+    /**
+     * Get student-wise attendance stats for a course.
+     */
+    public function getStudentStatsForCourse(int $courseId): array {
+        $sql = "SELECT
+                    u.id as student_id,
+                    u.full_name,
+                    u.student_code,
+                    COUNT(*) as total_records,
+                    SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as late_count,
+                    SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) as excused_count,
+                    ROUND(
+                        (SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) * 100, 1
+                    ) as attendance_rate
+                FROM attendance_records a
+                JOIN users u ON a.student_id = u.id
+                WHERE a.course_id = :course_id
+                GROUP BY u.id
+                ORDER BY u.full_name ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['course_id' => $courseId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Check if a teacher is assigned to a course.
+     */
+    public function isTeacherAssignedToCourse(int $teacherId, int $courseId): bool {
+        $sql = "SELECT COUNT(*) FROM teacher_assignments 
+                WHERE teacher_id = :teacher_id 
+                AND course_id = :course_id";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'teacher_id' => $teacherId,
+            'course_id' => $courseId,
+        ]);
+        
+        return $stmt->fetchColumn() > 0;
+    }
 }

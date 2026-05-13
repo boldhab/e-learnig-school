@@ -62,6 +62,9 @@ $router->get('/api/admin/classes/{classId}', [AdminController::class, 'getClassD
 $router->get('/api/admin/assignments/overview', [AdminController::class, 'getAssignmentsOverview']);
 $router->get('/api/admin/discussions/monitoring', [AdminController::class, 'getDiscussionsMonitoring']);
 $router->get('/api/admin/attendance/reports', [AdminController::class, 'getAttendanceReports']);
+$router->get('/api/admin/attendance/students-at-risk', [AdminController::class, 'getStudentsAtRisk']);
+$router->get('/api/admin/attendance/daily-summary', [AdminController::class, 'getDailyAttendanceSummary']);
+$router->get('/api/admin/attendance/course-details', [AdminController::class, 'getAttendanceCourseDetails']);
 $router->get('/api/admin/performance/analytics', [AdminController::class, 'getPerformanceAnalytics']);
 $router->get('/api/admin/academic/departments', [AdminController::class, 'getAcademicDepartments']);
 $router->post('/api/admin/academic/departments', [AdminController::class, 'createDepartment']);
@@ -123,6 +126,13 @@ $router->get('/api/performance/risk-report', [\App\Controllers\GapAnalysisContro
 $router->post('/api/attendance/bulk', [\App\Controllers\AttendanceController::class, 'bulkMark']);
 $router->get('/api/attendance/course', [\App\Controllers\AttendanceController::class, 'getCourseAttendance']);
 $router->get('/api/attendance/student', [\App\Controllers\AttendanceController::class, 'getStudentAttendance']);
+$router->get('/api/attendance/report/monthly', [\App\Controllers\AttendanceController::class, 'getMonthlyReport']);
+$router->get('/api/attendance/summary', [\App\Controllers\AttendanceController::class, 'getCourseSummary']);
+$router->get('/api/attendance/analytics/course', [\App\Controllers\AttendanceController::class, 'getCourseAnalytics']);
+$router->get('/api/attendance/analytics/institution', [\App\Controllers\AttendanceController::class, 'getInstitutionAnalytics']);
+$router->get('/api/attendance/insights', [\App\Controllers\AttendanceController::class, 'getInsights']);
+$router->get('/api/attendance/export/csv', [\App\Controllers\AttendanceController::class, 'exportCSV']);
+$router->get('/api/attendance/student/:id/history', [\App\Controllers\AttendanceController::class, 'getStudentHistory']);
 $router->post('/api/discussions/topics/{id}/close', [\App\Controllers\DiscussionController::class, 'closeTopic']);
 $router->post('/api/discussions/topics/{id}/open', [\App\Controllers\DiscussionController::class, 'openTopic']);
 $router->get('/api/courses/{id}/discussion', [\App\Controllers\DiscussionController::class, 'getCourseDiscussion']);
@@ -136,12 +146,6 @@ $router->post('/api/change-password', [UserController::class, 'changePassword'])
 $router->post('/api/materials/upload', [\App\Controllers\ContentController::class, 'upload']);
 $router->get('/api/materials', [\App\Controllers\ContentController::class, 'listForStudent']);
 $router->delete('/api/materials', [\App\Controllers\ContentController::class, 'delete']);
-
-// Attendance Routes
-$router->post('/api/attendance/mark', [AttendanceController::class, 'mark']);
-$router->get('/api/attendance/student/{id}', [AttendanceController::class, 'getByStudent']);
-$router->get('/api/attendance/course/{id}', [AttendanceController::class, 'getByCourse']);
-$router->get('/api/attendance/report/monthly', [AttendanceController::class, 'getMonthlyReport']);
 
 // Performance Routes
 $router->post('/api/performance/generate', [PerformanceController::class, 'generate']);

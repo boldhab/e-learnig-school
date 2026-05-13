@@ -318,6 +318,11 @@ const AttendancePage = () => {
               <p className="text-slate-400 font-medium">
                 {searchTerm ? 'No students match your search.' : 'No students found in this class.'}
               </p>
+              {!searchTerm && (
+                <p className="text-slate-300 text-sm mt-2">
+                  Students need to be assigned to this class before you can mark attendance.
+                </p>
+              )}
             </div>
           ) : (
             <table className="w-full">

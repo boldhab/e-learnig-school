@@ -344,6 +344,53 @@ const AttendancePage = () => {
     );
   }
 
+  // ── Empty data state ───────────────────────────────────────────────────────
+  if (!error && (!summary || summary.overall?.total === 0)) {
+    return (
+      <div className="p-6 pb-12">
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
+            Attendance Tracking
+          </h1>
+          <p className="text-lg" style={{ color: COLORS.TEXT_SECONDARY }}>
+            Monitor your class attendance and participation
+          </p>
+        </motion.div>
+
+        <div className="flex flex-col items-center justify-center min-h-[60vh] bg-white rounded-2xl border" style={{ borderColor: COLORS.BORDER }}>
+          <Calendar size={64} className="mb-4" style={{ color: COLORS.TEXT_SECONDARY }} />
+          <h2 className="text-xl font-semibold mb-2" style={{ color: COLORS.TEXT_PRIMARY }}>
+            No Attendance Records Yet
+          </h2>
+          <p className="text-center max-w-md mb-6" style={{ color: COLORS.TEXT_SECONDARY }}>
+            Your teachers haven't recorded any attendance data yet. Attendance records will appear here once your teachers start marking attendance.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center max-w-lg">
+            <div className="p-4 rounded-lg" style={{ backgroundColor: `${COLORS.EMERALD_GREEN}18` }}>
+              <CheckCircle size={24} className="mx-auto mb-2" style={{ color: COLORS.EMERALD_GREEN }} />
+              <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>Present</p>
+              <p className="text-xs" style={{ color: COLORS.TEXT_SECONDARY }}>On-time attendance</p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ backgroundColor: `${COLORS.WARNING}18` }}>
+              <Clock size={24} className="mx-auto mb-2" style={{ color: COLORS.WARNING }} />
+              <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>Late</p>
+              <p className="text-xs" style={{ color: COLORS.TEXT_SECONDARY }}>Delayed arrival</p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ backgroundColor: `${COLORS.DANGER}18` }}>
+              <XCircle size={24} className="mx-auto mb-2" style={{ color: COLORS.DANGER }} />
+              <p className="font-semibold text-sm" style={{ color: COLORS.TEXT_PRIMARY }}>Absent</p>
+              <p className="text-xs" style={{ color: COLORS.TEXT_SECONDARY }}>Not present</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Error state ────────────────────────────────────────────────────────────
   if (error) {
     return (
