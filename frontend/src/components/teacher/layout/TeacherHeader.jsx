@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Bell, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../../constants/teacherTheme';
 import { useAuth } from '../../../contexts/AuthContext';
+import NotificationBell from '../../common/NotificationBell';
 
 const TeacherHeader = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifications, setNotifications] = useState(5);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -52,21 +53,7 @@ const TeacherHeader = () => {
       {/* Right Section */}
       <div className="flex items-center gap-6 ml-6">
         {/* Notifications */}
-        <motion.button
-          className="relative"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Bell size={20} style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} />
-          {notifications > 0 && (
-            <span
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-xs font-bold flex items-center justify-center"
-              style={{ backgroundColor: TEACHER_COLORS.DANGER }}
-            >
-              {notifications}
-            </span>
-          )}
-        </motion.button>
+        <NotificationBell />
 
         {/* Profile Menu */}
         <div className="relative">
@@ -79,8 +66,9 @@ const TeacherHeader = () => {
               className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
               style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
             >
-              DR
+              {user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase() : 'DR'}
             </div>
+            <span className="hidden sm:block text-sm font-medium" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>{user?.full_name}</span>
             <ChevronDown size={16} style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
           </motion.button>
 
@@ -96,10 +84,24 @@ const TeacherHeader = () => {
               exit={{ opacity: 0, y: -10 }}
             >
               <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  navigate('/teacher/profile');
+                }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors"
                 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}
               >
                 My Profile
+              </button>
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  navigate('/teacher/notifications');
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors"
+                style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}
+              >
+                Notifications
               </button>
               <button
                 className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors"

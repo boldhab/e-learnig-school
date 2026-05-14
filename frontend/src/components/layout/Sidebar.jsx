@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  HelpCircle,
 } from 'lucide-react';
 import { COLORS, RADIUS, SHADOWS } from '../../constants/theme';
 
@@ -31,6 +32,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { icon: Calendar, label: 'Attendance', path: '/student/attendance' },
     { icon: Bell, label: 'Notifications', path: '/student/notifications' },
     { icon: User, label: 'Profile', path: '/student/profile' },
+    { icon: HelpCircle, label: 'Guide', path: '/student/guide' },
   ];
 
   const isActive = (path) => location.pathname === path;

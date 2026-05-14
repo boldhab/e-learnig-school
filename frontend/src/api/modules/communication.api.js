@@ -15,7 +15,10 @@ const communicationApi = {
 
   deleteTopic: (topicId) => api.delete(`discussions/topics/${topicId}`),
   
-  updateTopicStatus: (topicId, status) => api.post(`discussions/topics/${topicId}/${status}`)
+  updateTopicStatus: (topicId, status) => api.post(`discussions/topics/${topicId}/${status}`),
+
+  // Create a discussion group (teacher)
+  createGroup: (data) => api.post(`discussions/groups`, data)
 };
 
 export default communicationApi;

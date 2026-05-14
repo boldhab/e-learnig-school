@@ -23,7 +23,9 @@ export const NotificationProvider = ({ children }) => {
       ]);
       const list = nRes?.data?.data ?? nRes?.data ?? [];
       setNotifications(Array.isArray(list) ? list : []);
-      const count = cRes?.data?.data ?? cRes?.data;
+      // backend may return { data: { unread_count: N } } or { unread_count: N }
+      const countObj = cRes?.data?.data ?? cRes?.data ?? 0;
+      const count = typeof countObj === 'object' ? (countObj.unread_count ?? countObj) : countObj;
       setUnreadCount(Number(count) || 0);
     } catch (err) {
       // ignore – SSE will still stream new notifications
@@ -46,14 +48,14 @@ export const NotificationProvider = ({ children }) => {
     
     const eventSource = new EventSource(sseUrl);
 
-    eventSource.addEventListener('notification.received', (event) => {
+        eventSource.addEventListener('notification.received', (event) => {
       try {
         const data = JSON.parse(event.data);
         console.log('New SSE notification:', data);
         
         // Update local state
-        setNotifications(prev => [data, ...prev]);
-        setUnreadCount(prev => prev + 1);
+            setNotifications(prev => [data, ...prev]);
+            setUnreadCount(prev => prev + 1);
 
         // Trigger Toast
         showToast(data);
@@ -118,7 +120,7 @@ export const NotificationProvider = ({ children }) => {
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, setUnreadCount }}>
+    <NotificationContext.Provider value={{ notifications, setNotifications, unreadCount, setUnreadCount }}>
       {children}
     </NotificationContext.Provider>
   );

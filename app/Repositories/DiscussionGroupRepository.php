@@ -3,27 +3,57 @@
 namespace App\Repositories;
 
 use App\Core\Database;
-use PDO;
 
 class DiscussionGroupRepository {
     protected $db;
 
     public function __construct() {
         $this->db = Database::getInstance();
+        $this->ensureSchema();
     }
 
-    public function create($courseId, $title) {
-        $sql = "INSERT INTO discussion_groups (course_id, title) VALUES (?, ?) 
-                ON DUPLICATE KEY UPDATE title = ?";
+    protected function ensureSchema() {
+        $columnsStmt = $this->db->query("SHOW COLUMNS FROM discussion_groups LIKE 'class_id'");
+        $hasClassId = (bool) $columnsStmt->fetch();
+
+        if (!$hasClassId) {
+            $this->db->exec("ALTER TABLE discussion_groups ADD COLUMN class_id INT NULL AFTER course_id");
+            $this->db->exec("ALTER TABLE discussion_groups ADD CONSTRAINT fk_discussion_groups_class FOREIGN KEY (class_id) REFERENCES categories(id) ON DELETE CASCADE");
+        }
+
+        $legacyIndexStmt = $this->db->query("SHOW INDEX FROM discussion_groups WHERE Key_name = 'course_id'");
+        if ($legacyIndexStmt->fetch()) {
+            $this->db->exec("ALTER TABLE discussion_groups DROP INDEX course_id");
+        }
+
+        $compositeIndexStmt = $this->db->query("SHOW INDEX FROM discussion_groups WHERE Key_name = 'unique_course_class'");
+        if (!$compositeIndexStmt->fetch()) {
+            $this->db->exec("ALTER TABLE discussion_groups ADD UNIQUE KEY unique_course_class (course_id, class_id)");
+        }
+    }
+
+    public function create($courseId, $classId, $title) {
+        $sql = "INSERT INTO discussion_groups (course_id, class_id, title) VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE title = VALUES(title)";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$courseId, $title, $title]);
+        $stmt->execute([$courseId, $classId, $title]);
         return $this->db->lastInsertId();
     }
 
     public function findByCourseId($courseId) {
-        $sql = "SELECT * FROM discussion_groups WHERE course_id = :course_id";
+        $sql = "SELECT * FROM discussion_groups WHERE course_id = :course_id ORDER BY class_id IS NULL DESC, created_at DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['course_id' => $courseId]);
+        return $stmt->fetch();
+    }
+
+    public function findByCourseAndClass($courseId, $classId) {
+        $sql = "SELECT * FROM discussion_groups WHERE course_id = :course_id AND class_id = :class_id LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'course_id' => $courseId,
+            'class_id' => $classId,
+        ]);
         return $stmt->fetch();
     }
 
@@ -35,27 +65,36 @@ class DiscussionGroupRepository {
     }
 
     public function getAllGroups() {
-        $sql = "SELECT dg.*, c.name AS course_name
+        $sql = "SELECT dg.*, c.name AS course_name, cl.name AS class_name
                 FROM discussion_groups dg
                 LEFT JOIN categories c ON c.id = dg.course_id
+                LEFT JOIN categories cl ON cl.id = dg.class_id
                 ORDER BY dg.created_at DESC";
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll();
     }
 
     public function getGroupsByStudent($classId) {
-        $sql = "SELECT DISTINCT dg.* FROM discussion_groups dg
+        $sql = "SELECT DISTINCT dg.*, c.name AS course_name, cl.name AS class_name
+                FROM discussion_groups dg
                 JOIN teacher_assignments ta ON dg.course_id = ta.course_id
-                WHERE ta.class_id = :class_id";
+                LEFT JOIN categories c ON c.id = dg.course_id
+                LEFT JOIN categories cl ON cl.id = dg.class_id
+                WHERE ta.class_id = :class_id
+                  AND (dg.class_id = :class_id OR dg.class_id IS NULL)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['class_id' => $classId]);
         return $stmt->fetchAll();
     }
 
     public function getGroupsByTeacher($teacherId) {
-        $sql = "SELECT DISTINCT dg.* FROM discussion_groups dg
+        $sql = "SELECT DISTINCT dg.*, c.name AS course_name, cl.name AS class_name
+                FROM discussion_groups dg
                 JOIN teacher_assignments ta ON dg.course_id = ta.course_id
-                WHERE ta.teacher_id = :teacher_id";
+                LEFT JOIN categories c ON c.id = dg.course_id
+                LEFT JOIN categories cl ON cl.id = dg.class_id
+                WHERE ta.teacher_id = :teacher_id
+                  AND (dg.class_id = ta.class_id OR dg.class_id IS NULL)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['teacher_id' => $teacherId]);
         return $stmt->fetchAll();

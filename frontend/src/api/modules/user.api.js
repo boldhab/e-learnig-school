@@ -2,11 +2,11 @@ import api from '../axios.config';
 
 const userApi = {
   getProfile: async () => {
-    const response = await api.get('/user/profile');
+    const response = await api.get('profile');
     return response.data;
   },
   updateProfile: async (data) => {
-    const response = await api.put('/user/profile', data);
+    const response = await api.put('profile', data);
     return response.data;
   },
 };

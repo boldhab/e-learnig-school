@@ -66,6 +66,8 @@ class GapAnalysisService {
             'weak_topics' => $weakTopics,
             'improvement_recommendations' => $recommendations,
             'risk_level' => $riskLevel,
+            'attendance_percentage' => round($attendancePercentage, 2),
+            'overall_score' => round($overallScore, 2),
             'generated_by' => $generatedBy
         ];
 

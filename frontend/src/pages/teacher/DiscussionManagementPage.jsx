@@ -5,6 +5,7 @@ import {
   Loader2,
   Lock,
   MessageCircle,
+  MessageSquarePlus,
   MessageSquareText,
   Search,
   Send,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../constants/teacherTheme';
 import communicationApi from '../../api/modules/communication.api';
+import contentApi from '../../api/modules/content.api';
 
 const StatCard = ({ icon: Icon, label, value, accent }) => (
   <div
@@ -95,20 +97,23 @@ const MessageRow = ({ message, onDelete }) => (
 
 const DiscussionManagementPage = () => {
   const [groups, setGroups] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [topics, setTopics] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedSectionKey, setSelectedSectionKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [topicLoading, setTopicLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [newTopicTitle, setNewTopicTitle] = useState('');
+  const [newGroupTitle, setNewGroupTitle] = useState('');
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
 
   const fetchGroups = useCallback(async () => {
-    setLoading(true);
     try {
       const response = await communicationApi.getGroups();
       const nextGroups = response.data?.data ?? response.data ?? [];
@@ -119,8 +124,18 @@ const DiscussionManagementPage = () => {
       console.error('Failed to load teacher discussion groups:', error);
       setGroups([]);
       setSelectedGroup(null);
-    } finally {
-      setLoading(false);
+    }
+  }, []);
+
+  const fetchCourses = useCallback(async () => {
+    try {
+      const response = await contentApi.getCourses();
+      const nextCourses = response.data?.data ?? response.data ?? [];
+      const normalizedCourses = Array.isArray(nextCourses) ? nextCourses : [];
+      setCourses(normalizedCourses);
+    } catch (error) {
+      console.error('Failed to load teacher courses:', error);
+      setCourses([]);
     }
   }, []);
 
@@ -172,18 +187,51 @@ const DiscussionManagementPage = () => {
   }, []);
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchGroups(), fetchCourses()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [fetchGroups, fetchCourses]);
 
   useEffect(() => {
     if (selectedGroup?.id) {
       fetchTopics(selectedGroup.id);
+    } else {
+      setTopics([]);
+      setSelectedTopic(null);
     }
   }, [selectedGroup, fetchTopics]);
 
   useEffect(() => {
     fetchMessages(selectedTopic?.id);
   }, [selectedTopic, fetchMessages]);
+
+  const availableSectionsForGroups = useMemo(() => {
+    const groupedSectionKeys = new Set(
+      groups.map((group) => `${group.course_id}:${group.class_id ?? ''}`)
+    );
+
+    return courses.filter((course) => {
+      const key = `${course.id}:${course.class_id ?? ''}`;
+      return !groupedSectionKeys.has(key);
+    });
+  }, [courses, groups]);
+
+  useEffect(() => {
+    if (
+      !selectedSectionKey ||
+      !availableSectionsForGroups.some((course) => `${course.id}:${course.class_id ?? ''}` === selectedSectionKey)
+    ) {
+      const first = availableSectionsForGroups[0];
+      setSelectedSectionKey(first ? `${first.id}:${first.class_id ?? ''}` : '');
+    }
+  }, [availableSectionsForGroups, selectedSectionKey]);
 
   const filteredTopics = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -199,6 +247,35 @@ const DiscussionManagementPage = () => {
     openTopics: topics.filter((topic) => topic.status === 'open').length,
     messages: messages.length,
   }), [groups, topics, messages]);
+
+  const handleCreateGroup = async () => {
+    const course = availableSectionsForGroups.find((item) => `${item.id}:${item.class_id ?? ''}` === selectedSectionKey);
+    if (!course) {
+      alert('Please select a course and class without an existing discussion group.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await communicationApi.createGroup({
+        course_id: course.id,
+        class_id: course.class_id,
+        title: newGroupTitle.trim() || `${course.name} - ${course.class_name || 'Class'}`,
+      });
+      const createdGroup = response.data?.data ?? response.data ?? null;
+      setNewGroupTitle('');
+      setShowCreateGroup(false);
+      await fetchGroups();
+      if (createdGroup?.id) {
+        setSelectedGroup(createdGroup);
+      }
+    } catch (error) {
+      console.error('Failed to create discussion group:', error);
+      alert(error.response?.data?.message || 'Failed to create discussion group.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleCreateTopic = async () => {
     if (!selectedGroup?.id || !newTopicTitle.trim()) return;
@@ -294,7 +371,7 @@ const DiscussionManagementPage = () => {
               Discussion Management
             </h1>
             <p className="mt-2 max-w-2xl" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-              Moderate course discussions, guide conversations, and step into any thread from your assigned groups.
+              Moderate course discussions, guide conversations, and create student discussion groups for your courses.
             </p>
           </div>
           <div className="relative w-full max-w-sm">
@@ -318,183 +395,239 @@ const DiscussionManagementPage = () => {
         <StatCard icon={Users} label="Messages" value={stats.messages} accent={TEACHER_COLORS.GRADE} />
       </div>
 
-      {groups.length === 0 ? (
-        <div className="rounded-3xl border border-dashed bg-white py-20 text-center" style={{ borderColor: TEACHER_COLORS.BORDER }}>
-          <MessageSquareText size={46} className="mx-auto mb-4 opacity-30" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
-          <p className="text-lg font-medium" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-            No discussion groups are assigned to this teacher yet.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="space-y-6">
-            <div className="rounded-3xl border bg-white p-5" style={{ borderColor: TEACHER_COLORS.BORDER, boxShadow: TEACHER_SHADOWS.SM }}>
-              <label className="mb-3 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="space-y-6">
+          <div className="rounded-3xl border bg-white p-5" style={{ borderColor: TEACHER_COLORS.BORDER, boxShadow: TEACHER_SHADOWS.SM }}>
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
                 Course Group
               </label>
-              <select
-                value={selectedGroup?.id ?? ''}
-                onChange={(event) => setSelectedGroup(groups.find((group) => String(group.id) === event.target.value) ?? null)}
-                className="w-full rounded-xl border bg-white px-4 py-3 outline-none transition focus:ring-2"
-                style={{ borderColor: TEACHER_COLORS.BORDER }}
+              <button
+                type="button"
+                onClick={() => setShowCreateGroup((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold"
+                style={{ borderColor: TEACHER_COLORS.BORDER, color: TEACHER_COLORS.TEXT_PRIMARY }}
               >
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>{group.title}</option>
-                ))}
-              </select>
+                <MessageSquarePlus size={16} />
+                Create Group
+              </button>
+            </div>
 
-              <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+            {showCreateGroup ? (
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                  Create Topic
+                  New Student Group
                 </label>
-                <div className="flex gap-2">
+                <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_auto]">
+                  <select
+                    value={selectedSectionKey}
+                    onChange={(event) => setSelectedSectionKey(event.target.value)}
+                    className="rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
+                    style={{ borderColor: TEACHER_COLORS.BORDER }}
+                  >
+                    <option value="">Select course and class</option>
+                    {availableSectionsForGroups.map((course) => (
+                      <option key={`${course.id}:${course.class_id}`} value={`${course.id}:${course.class_id ?? ''}`}>
+                        {course.name} - {course.class_name || 'Class'}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
-                    value={newTopicTitle}
-                    onChange={(event) => setNewTopicTitle(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        handleCreateTopic();
-                      }
-                    }}
-                    placeholder="Start a guided discussion..."
-                    className="flex-1 rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
+                    value={newGroupTitle}
+                    onChange={(event) => setNewGroupTitle(event.target.value)}
+                    placeholder="Group title (optional)"
+                    className="rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
                     style={{ borderColor: TEACHER_COLORS.BORDER }}
                   />
                   <button
                     type="button"
-                    onClick={handleCreateTopic}
-                    disabled={submitting || !newTopicTitle.trim()}
+                    onClick={handleCreateGroup}
+                    disabled={submitting || !selectedSectionKey || availableSectionsForGroups.length === 0}
                     className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
                   >
                     Create
                   </button>
                 </div>
+                <p className="mt-2 text-xs" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                  {availableSectionsForGroups.length === 0
+                    ? 'All of your assigned course sections already have discussion groups.'
+                    : 'Choose one of your assigned course and class sections that does not already have a student discussion group.'}
+                </p>
               </div>
-            </div>
+            ) : null}
 
-            <div className="rounded-3xl border bg-white p-5" style={{ borderColor: TEACHER_COLORS.BORDER, boxShadow: TEACHER_SHADOWS.SM }}>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Topics</h2>
-                {topicLoading && <Loader2 size={18} className="animate-spin" style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />}
-              </div>
-              <div className="space-y-3">
-                {filteredTopics.length === 0 ? (
-                  <p className="py-10 text-center text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                    No topics match this view.
-                  </p>
+            <div className="mt-5">
+              <select
+                value={selectedGroup?.id ?? ''}
+                onChange={(event) => setSelectedGroup(groups.find((group) => String(group.id) === event.target.value) ?? null)}
+                className="w-full rounded-xl border bg-white px-4 py-3 outline-none transition focus:ring-2"
+                style={{ borderColor: TEACHER_COLORS.BORDER }}
+              >
+                {groups.length === 0 ? (
+                  <option value="">No groups available</option>
                 ) : (
-                  filteredTopics.map((topic) => (
-                    <TopicRow
-                      key={topic.id}
-                      topic={topic}
-                      active={selectedTopic?.id === topic.id}
-                      onSelect={setSelectedTopic}
-                    />
+                  groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.title}{group.class_name ? ` - ${group.class_name}` : ''}
+                    </option>
                   ))
                 )}
+              </select>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                Create Topic
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTopicTitle}
+                  onChange={(event) => setNewTopicTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleCreateTopic();
+                    }
+                  }}
+                  placeholder="Start a guided discussion..."
+                  className="flex-1 rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
+                  style={{ borderColor: TEACHER_COLORS.BORDER }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateTopic}
+                  disabled={submitting || !newTopicTitle.trim() || !selectedGroup}
+                  className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
+                >
+                  Create
+                </button>
               </div>
             </div>
           </div>
 
           <div className="rounded-3xl border bg-white p-5" style={{ borderColor: TEACHER_COLORS.BORDER, boxShadow: TEACHER_SHADOWS.SM }}>
-            {selectedTopic ? (
-              <>
-                <div className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-start md:justify-between" style={{ borderColor: TEACHER_COLORS.BORDER }}>
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: TEACHER_COLORS.ACCENT_TEAL }}>
-                      Active Thread
-                    </p>
-                    <h2 className="mt-2 text-2xl font-bold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>
-                      {selectedTopic.title}
-                    </h2>
-                    <p className="mt-2 text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                      Created by {selectedTopic.author_name} on {new Date(selectedTopic.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTopicStatus(selectedTopic.status === 'open' ? 'close' : 'open')}
-                      disabled={submitting}
-                      className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                      style={{ backgroundColor: selectedTopic.status === 'open' ? TEACHER_COLORS.WARNING : TEACHER_COLORS.SUCCESS }}
-                    >
-                      {selectedTopic.status === 'open' ? <Lock size={16} className="mr-2 inline-block" /> : <Unlock size={16} className="mr-2 inline-block" />}
-                      {selectedTopic.status === 'open' ? 'Close Topic' : 'Reopen Topic'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteTopic}
-                      disabled={submitting}
-                      className="rounded-xl border px-4 py-3 text-sm font-semibold disabled:opacity-60"
-                      style={{ borderColor: '#FCA5A5', color: TEACHER_COLORS.DANGER }}
-                    >
-                      <Trash2 size={16} className="mr-2 inline-block" />
-                      Delete Topic
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-5">
-                  <h3 className="text-lg font-semibold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Messages</h3>
-                  <div className="mt-4 max-h-[460px] space-y-3 overflow-y-auto pr-1">
-                    {messageLoading ? (
-                      <div className="flex items-center justify-center py-10">
-                        <Loader2 size={24} className="animate-spin" style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />
-                      </div>
-                    ) : messages.length === 0 ? (
-                      <p className="rounded-2xl border border-dashed py-10 text-center text-sm" style={{ borderColor: TEACHER_COLORS.BORDER, color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                        No messages in this topic yet.
-                      </p>
-                    ) : (
-                      messages.map((message) => (
-                        <MessageRow key={message.id} message={message} onDelete={handleDeleteMessage} />
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t pt-5" style={{ borderColor: TEACHER_COLORS.BORDER }}>
-                  <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                    Add Teacher Reply
-                  </label>
-                  <div className="flex gap-3">
-                    <textarea
-                      value={replyText}
-                      onChange={(event) => setReplyText(event.target.value)}
-                      placeholder={selectedTopic.status === 'open' ? 'Guide the discussion or answer questions...' : 'Reopen this topic to reply.'}
-                      disabled={selectedTopic.status !== 'open' || submitting}
-                      className="min-h-[96px] flex-1 rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 disabled:bg-slate-50"
-                      style={{ borderColor: TEACHER_COLORS.BORDER }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSendMessage}
-                      disabled={selectedTopic.status !== 'open' || submitting || !replyText.trim()}
-                      className="self-end rounded-2xl px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
-                    >
-                      <Send size={16} className="mr-2 inline-block" />
-                      Reply
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
-                <MessageSquareText size={48} className="mb-4 opacity-30" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
-                <p className="text-lg font-medium" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Select a topic to manage it.</p>
-                <p className="mt-2 max-w-sm text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
-                  You can review messages, close threads, delete inappropriate content, and add teacher replies from here.
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Topics</h2>
+              {topicLoading && <Loader2 size={18} className="animate-spin" style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />}
+            </div>
+            <div className="space-y-3">
+              {filteredTopics.length === 0 ? (
+                <p className="py-10 text-center text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                  {groups.length === 0 ? 'Create a group first to start student discussions.' : 'No topics match this view.'}
                 </p>
-              </div>
-            )}
+              ) : (
+                filteredTopics.map((topic) => (
+                  <TopicRow
+                    key={topic.id}
+                    topic={topic}
+                    active={selectedTopic?.id === topic.id}
+                    onSelect={setSelectedTopic}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </div>
-      )}
+
+        <div className="rounded-3xl border bg-white p-5" style={{ borderColor: TEACHER_COLORS.BORDER, boxShadow: TEACHER_SHADOWS.SM }}>
+          {selectedTopic ? (
+            <>
+              <div className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-start md:justify-between" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: TEACHER_COLORS.ACCENT_TEAL }}>
+                    Active Thread
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>
+                    {selectedTopic.title}
+                  </h2>
+                  <p className="mt-2 text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                    Created by {selectedTopic.author_name} on {new Date(selectedTopic.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTopicStatus(selectedTopic.status === 'open' ? 'close' : 'open')}
+                    disabled={submitting}
+                    className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ backgroundColor: selectedTopic.status === 'open' ? TEACHER_COLORS.WARNING : TEACHER_COLORS.SUCCESS }}
+                  >
+                    {selectedTopic.status === 'open' ? <Lock size={16} className="mr-2 inline-block" /> : <Unlock size={16} className="mr-2 inline-block" />}
+                    {selectedTopic.status === 'open' ? 'Close Topic' : 'Reopen Topic'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteTopic}
+                    disabled={submitting}
+                    className="rounded-xl border px-4 py-3 text-sm font-semibold disabled:opacity-60"
+                    style={{ borderColor: '#FCA5A5', color: TEACHER_COLORS.DANGER }}
+                  >
+                    <Trash2 size={16} className="mr-2 inline-block" />
+                    Delete Topic
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <h3 className="text-lg font-semibold" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Messages</h3>
+                <div className="mt-4 max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                  {messageLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 size={24} className="animate-spin" style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed py-10 text-center text-sm" style={{ borderColor: TEACHER_COLORS.BORDER, color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                      No messages in this topic yet.
+                    </p>
+                  ) : (
+                    messages.map((message) => (
+                      <MessageRow key={message.id} message={message} onDelete={handleDeleteMessage} />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 border-t pt-5" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                  Add Teacher Reply
+                </label>
+                <div className="flex gap-3">
+                  <textarea
+                    value={replyText}
+                    onChange={(event) => setReplyText(event.target.value)}
+                    placeholder={selectedTopic.status === 'open' ? 'Guide the discussion or answer questions...' : 'Reopen this topic to reply.'}
+                    disabled={selectedTopic.status !== 'open' || submitting}
+                    className="min-h-[96px] flex-1 rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 disabled:bg-slate-50"
+                    style={{ borderColor: TEACHER_COLORS.BORDER }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendMessage}
+                    disabled={selectedTopic.status !== 'open' || submitting || !replyText.trim()}
+                    className="self-end rounded-2xl px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
+                  >
+                    <Send size={16} className="mr-2 inline-block" />
+                    Reply
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
+              <MessageSquareText size={48} className="mb-4 opacity-30" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
+              <p className="text-lg font-medium" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Select a topic to manage it.</p>
+              <p className="mt-2 max-w-sm text-sm" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
+                Create a group for students, open a topic, then review messages and add teacher replies from here.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 };

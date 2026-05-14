@@ -21,6 +21,8 @@ const adminApi = {
   getDetailedActivityLogs: (limit = 100) => api.get("admin/logs/detailed", { params: { limit } }),
   getAssignmentsOverview: () => api.get("admin/assignments/overview"),
   getDiscussionsMonitoring: () => api.get("admin/discussions/monitoring"),
+  // Discussion actions
+  deleteThread: (threadId) => api.delete(`discussions/topics/${threadId}`),
   getAttendanceReports: () => api.get("admin/attendance/reports"),
   getPerformanceAnalytics: () => api.get("admin/performance/analytics"),
 

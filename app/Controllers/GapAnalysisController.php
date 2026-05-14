@@ -63,4 +63,15 @@ class GapAnalysisController extends BaseController {
             $this->error($e->getMessage(), 400);
         }
     }
+
+    public function getRiskReport(Request $request, Response $response) {
+        $this->requireRole(['TEACHER', 'ADMIN']);
+
+        try {
+            $records = $this->gapAnalysisService->getHighRiskStudents();
+            $this->success($records, 'Risk report retrieved');
+        } catch (Exception $e) {
+            $this->error($e->getMessage(), 400);
+        }
+    }
 }

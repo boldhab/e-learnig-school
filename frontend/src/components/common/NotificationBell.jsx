@@ -1,16 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Info, AlertTriangle, FileText, CheckCircle2, Award, Clock } from 'lucide-react';
+import { Bell, Info, AlertTriangle, FileText, Award, Clock } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { COLORS } from '../../constants/theme';
 import notificationApi from '../../api/modules/notification.api';
 
 const NotificationBell = () => {
-  const { notifications, unreadCount, setUnreadCount } = useNotifications();
+  const { notifications, setNotifications, unreadCount, setUnreadCount } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -23,7 +22,28 @@ const NotificationBell = () => {
 
   const handleToggle = () => {
     setIsOpen(!isOpen);
-    if (!isOpen) setUnreadCount(0); // Mark as read locally for UX
+  };
+
+  const markAllRead = async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
+      setUnreadCount(0);
+    } catch (e) {
+      console.error('Failed to mark all read', e);
+    }
+  };
+
+  const handleClickNotification = async (notif) => {
+    try {
+      if (!notif.read) {
+        await notificationApi.markAsRead(notif.id);
+        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: 1 } : n)));
+        setUnreadCount((c) => Math.max(0, c - 1));
+      }
+    } catch (e) {
+      console.error('Failed to mark notification read', e);
+    }
   };
 
   const getIcon = (type) => {
@@ -62,11 +82,11 @@ const NotificationBell = () => {
           >
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-slate-900">Notifications</h3>
-              <button className="text-xs text-blue-600 font-bold hover:underline">Mark all read</button>
+              <button onClick={markAllRead} className="text-xs text-blue-600 font-bold hover:underline">Mark all read</button>
             </div>
 
             <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-              {notifications.length === 0 ? (
+              {(!notifications || notifications.length === 0) ? (
                 <div className="p-8 text-center">
                   <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Bell className="text-slate-300" size={24} />
@@ -75,14 +95,13 @@ const NotificationBell = () => {
                 </div>
               ) : (
                 notifications.map((notif, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={notif.id ?? `notif-${index}`}
+                    onClick={() => handleClickNotification(notif)}
                     className={`p-4 border-b last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.read ? 'opacity-60' : ''}`}
                   >
                     <div className="flex gap-3">
-                      <div className="flex-shrink-0 pt-1">
-                        {getIcon(notif.type)}
-                      </div>
+                      <div className="flex-shrink-0 pt-1">{getIcon(notif.type)}</div>
                       <div className="flex-1">
                         <p className="text-sm font-bold text-slate-900 leading-tight mb-1">{notif.title}</p>
                         <p className="text-xs text-slate-500 leading-relaxed mb-2">{notif.message}</p>
@@ -97,9 +116,10 @@ const NotificationBell = () => {
               )}
             </div>
 
-            <button className="w-full py-3 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border-t transition-colors">
-              View All Notifications
-            </button>
+            <div className="flex">
+              <button onClick={markAllRead} className="flex-1 py-3 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border-t transition-colors">Mark all read</button>
+              <button className="flex-1 py-3 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border-t transition-colors">View All Notifications</button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

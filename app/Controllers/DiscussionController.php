@@ -55,6 +55,25 @@ class DiscussionController extends BaseController {
         }
     }
 
+    public function createGroup(Request $request, Response $response) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
+        $data = HtmlSanitizer::sanitize($request->getBody());
+        $user = $GLOBALS['auth_user'];
+
+        try {
+            $group = $this->discussionService->createGroup(
+                $data['course_id'] ?? null,
+                $data['class_id'] ?? null,
+                $data['title'] ?? '',
+                $user['id'],
+                $user['role_name']
+            );
+            $this->success($group, 'Discussion group created successfully', 201);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
     public function listTopics(Request $request, Response $response, $groupId) {
         $this->requireAuth();
         try {

@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  HelpCircle,
 } from 'lucide-react';
 import { TEACHER_COLORS, TEACHER_SHADOWS } from '../../../constants/teacherTheme';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -36,6 +37,7 @@ const TeacherSidebar = ({ isOpen, setIsOpen }) => {
     { icon: BarChart3, label: 'Analytics', path: '/teacher/analytics' },
     { icon: Bell, label: 'Notifications', path: '/teacher/notifications' },
     { icon: User, label: 'Profile', path: '/teacher/profile' },
+    { icon: HelpCircle, label: 'Guide', path: '/teacher/guide' },
   ];
 
   const isActive = (path) => location.pathname === path;

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Core\Database;
 use App\Repositories\DiscussionGroupRepository;
 use App\Repositories\DiscussionTopicRepository;
 use App\Repositories\DiscussionMessageRepository;
@@ -24,9 +25,9 @@ class DiscussionService {
     public function autoCreateGroup($courseId, $courseName, $sectionName = null) {
         $title = $courseName;
         if ($sectionName) {
-            $title .= " – " . $sectionName;
+            $title .= " - " . $sectionName;
         }
-        return $this->groupRepo->create($courseId, $title);
+        return $this->groupRepo->create($courseId, null, $title);
     }
 
     public function getGroupForCourse($courseId) {
@@ -34,6 +35,42 @@ class DiscussionService {
         if (!$group) {
             throw new Exception("Discussion group not found for this course.");
         }
+        return $group;
+    }
+
+    public function createGroup($courseId, $classId, $title, $userId, $role) {
+        $courseId = (int) $courseId;
+        $classId = (int) $classId;
+
+        if ($courseId <= 0) {
+            throw new Exception("Valid course ID is required.");
+        }
+
+        if ($classId <= 0) {
+            throw new Exception("Valid class ID is required.");
+        }
+
+        $title = trim((string) $title);
+        if ($title === '') {
+            throw new Exception("Group title is required.");
+        }
+
+        if ($role === 'TEACHER' && !$this->teacherHasCourseAccess((int) $userId, $courseId, $classId)) {
+            throw new Exception("You are not assigned to this course and class.");
+        }
+
+        $existingGroup = $this->groupRepo->findByCourseAndClass($courseId, $classId);
+        if ($existingGroup) {
+            throw new Exception("A discussion group already exists for this course and class.");
+        }
+
+        $this->groupRepo->create($courseId, $classId, $title);
+        $group = $this->groupRepo->findByCourseAndClass($courseId, $classId);
+
+        if (!$group) {
+            throw new Exception("Failed to create discussion group.");
+        }
+
         return $group;
     }
 
@@ -75,15 +112,14 @@ class DiscussionService {
         if ($topic['status'] === 'closed') {
             throw new Exception("This topic is closed for new messages.");
         }
-        
+
         $id = $this->messageRepo->create($data);
-        
-        // Fetch full message with author info for broadcasting
+
         $messages = $this->messageRepo->getByTopic($data['topic_id']);
         $fullMessage = null;
-        foreach ($messages as $m) {
-            if ($m['id'] == $id) {
-                $fullMessage = $m;
+        foreach ($messages as $message) {
+            if ($message['id'] == $id) {
+                $fullMessage = $message;
                 break;
             }
         }
@@ -114,5 +150,17 @@ class DiscussionService {
         }
 
         return $this->topicRepo->delete($topicId);
+    }
+
+    protected function teacherHasCourseAccess(int $teacherId, int $courseId, int $classId): bool {
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM teacher_assignments WHERE teacher_id = :teacher_id AND course_id = :course_id AND class_id = :class_id");
+        $stmt->execute([
+            'teacher_id' => $teacherId,
+            'course_id' => $courseId,
+            'class_id' => $classId,
+        ]);
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 }

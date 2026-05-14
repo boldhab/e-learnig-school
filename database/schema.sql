@@ -135,10 +135,13 @@ CREATE TABLE IF NOT EXISTS grades (
 -- Discussion Groups Table
 CREATE TABLE IF NOT EXISTS discussion_groups (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id INT NOT NULL UNIQUE,
+    course_id INT NOT NULL,
+    class_id INT DEFAULT NULL,
     title VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (course_id) REFERENCES categories(id) ON DELETE CASCADE
+    UNIQUE KEY unique_course_class (course_id, class_id),
+    FOREIGN KEY (course_id) REFERENCES categories(id) ON DELETE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES categories(id) ON DELETE CASCADE
 );
 
 -- Discussion Topics Table
@@ -209,6 +212,8 @@ CREATE TABLE IF NOT EXISTS gap_analysis (
     weak_topics TEXT NOT NULL,
     improvement_recommendations TEXT NOT NULL,
     risk_level ENUM('low', 'medium', 'high') NOT NULL,
+    attendance_percentage DECIMAL(5,2) DEFAULT 0.00,
+    overall_score DECIMAL(5,2) DEFAULT 0.00,
     generated_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,

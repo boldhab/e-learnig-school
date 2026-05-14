@@ -8,6 +8,7 @@ import Discussions from '../pages/student/Discussions';
 import Grades from '../pages/student/Grades';
 import Attendance from '../pages/student/Attendance';
 import Notifications from '../pages/student/Notifications';
+import GuidePage from '../pages/student/GuidePage';
 
 const StudentRoutes = () => {
   return (
@@ -21,6 +22,7 @@ const StudentRoutes = () => {
         <Route path="grades" element={<Grades />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="guide" element={<GuidePage />} />
         <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
       </Routes>
     </MainLayout>

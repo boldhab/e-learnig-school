@@ -252,9 +252,8 @@ const DiscussionsMonitoringPage = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={handleDeleteThread}
-                      disabled={actionLoading}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-60"
+                      onClick={() => handleDeleteThread(selectedThread.id)}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600"
                     >
                       <Trash2 size={16} /> Delete
                     </button>

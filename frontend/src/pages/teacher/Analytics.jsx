@@ -20,6 +20,10 @@ import contentApi from '../../api/modules/content.api';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
+const unwrapApiData = (response) => response?.data?.data ?? response?.data ?? null;
+
+const toArray = (value) => Array.isArray(value) ? value : [];
+
 const StatCard = ({ title, value, icon: Icon, trend, color }) => (
   <motion.div
     className="bg-white p-6 rounded-2xl border shadow-sm"
@@ -56,13 +60,20 @@ const AnalyticsPage = () => {
           contentApi.getCourses(),
           performanceApi.getRiskReport()
         ]);
-        setCourses(coursesRes.data.data);
-        setRiskData(riskRes.data);
-        if (coursesRes.data.data.length > 0) {
-          setSelectedCourseId(coursesRes.data.data[0].id);
+
+        const nextCourses = toArray(unwrapApiData(coursesRes));
+        const nextRiskData = toArray(unwrapApiData(riskRes));
+
+        setCourses(nextCourses);
+        setRiskData(nextRiskData);
+
+        if (nextCourses.length > 0) {
+          setSelectedCourseId(nextCourses[0].id);
         }
       } catch (error) {
         console.error("Failed to fetch initial analytics data:", error);
+        setCourses([]);
+        setRiskData([]);
       } finally {
         setLoading(false);
       }
@@ -75,9 +86,10 @@ const AnalyticsPage = () => {
     const fetchCourseStats = async () => {
       try {
         const res = await performanceApi.getCoursePerformance(selectedCourseId);
-        setPerformanceData(res.data);
+        setPerformanceData(toArray(unwrapApiData(res)));
       } catch (error) {
         console.error("Failed to fetch course performance:", error);
+        setPerformanceData([]);
       }
     };
     fetchCourseStats();
@@ -91,22 +103,58 @@ const AnalyticsPage = () => {
     );
   }
 
-  // Sample data for charts (real data would be mapped from performanceData)
-  const distributionData = [
-    { name: 'Excellent (85+)', value: 12 },
-    { name: 'Good (70-85)', value: 18 },
-    { name: 'Average (50-70)', value: 15 },
-    { name: 'Poor (<50)', value: 5 },
-  ];
+  // Derive chart data from real performanceData
+  const computeDistribution = (rows) => {
+    const buckets = { excellent: 0, good: 0, average: 0, poor: 0 };
+    rows.forEach((r) => {
+      const score = Number(r.overall_score || 0);
+      if (score >= 85) buckets.excellent += 1;
+      else if (score >= 70) buckets.good += 1;
+      else if (score >= 50) buckets.average += 1;
+      else buckets.poor += 1;
+    });
+    return [
+      { name: 'Excellent (85+)', value: buckets.excellent },
+      { name: 'Good (70-85)', value: buckets.good },
+      { name: 'Average (50-70)', value: buckets.average },
+      { name: 'Poor (<50)', value: buckets.poor },
+    ];
+  };
 
-  const trendData = [
-    { name: 'Week 1', avg: 65 },
-    { name: 'Week 2', avg: 68 },
-    { name: 'Week 3', avg: 72 },
-    { name: 'Week 4', avg: 70 },
-    { name: 'Week 5', avg: 75 },
-    { name: 'Week 6', avg: 78 },
-  ];
+  const computeTrend = (rows, maxPoints = 6) => {
+    // Group by date (generated_at) and compute average overall_score per date
+    const map = new Map();
+    rows.forEach((r) => {
+      const dt = r.generated_at || r.created_at || null;
+      if (!dt) return;
+      const d = new Date(dt);
+      if (isNaN(d)) return;
+      // Use ISO date (YYYY-MM-DD) as key
+      const key = d.toISOString().slice(0, 10);
+      const cur = map.get(key) || { sum: 0, count: 0, date: d };
+      cur.sum += Number(r.overall_score || 0);
+      cur.count += 1;
+      map.set(key, cur);
+    });
+
+    // Sort dates ascending and pick last `maxPoints`
+    const sorted = Array.from(map.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+    const last = sorted.slice(-maxPoints);
+
+    return last.map(([key, v]) => ({ name: new Date(key).toLocaleDateString(), avg: v.count ? +(v.sum / v.count).toFixed(1) : 0 }));
+  };
+
+  const performanceRows = toArray(performanceData);
+  const activeStudents = performanceRows.length;
+  const classAverage = activeStudents > 0
+    ? `${(performanceRows.reduce((sum, row) => sum + Number(row.overall_score || 0), 0) / activeStudents).toFixed(1)}%`
+    : '0.0%';
+  const submissionRate = activeStudents > 0
+    ? `${Math.round((performanceRows.filter((row) => Number(row.overall_score || 0) > 0).length / activeStudents) * 100)}%`
+    : '0%';
+
+  const distributionData = computeDistribution(performanceRows);
+  const trendData = computeTrend(performanceRows, 6);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -125,7 +173,7 @@ const AnalyticsPage = () => {
             style={{ borderColor: TEACHER_COLORS.BORDER }}
           >
             {courses.map(course => (
-              <option key={course.id} value={course.id}>{course.name}</option>
+              <option key={`course-${course.id}`} value={course.id}>{course.name}</option>
             ))}
           </select>
         </div>
@@ -133,9 +181,9 @@ const AnalyticsPage = () => {
 
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Class Average" value="76.4%" icon={Award} trend="+2.4%" color="#3B82F6" />
-        <StatCard title="Submission Rate" value="92%" icon={Target} trend="+5%" color="#10B981" />
-        <StatCard title="Active Students" value="48" icon={Users} color="#8B5CF6" />
+        <StatCard title="Class Average" value={classAverage} icon={Award} color="#3B82F6" />
+        <StatCard title="Submission Rate" value={submissionRate} icon={Target} color="#10B981" />
+        <StatCard title="Active Students" value={activeStudents} icon={Users} color="#8B5CF6" />
         <StatCard title="At-Risk Students" value={riskData.length} icon={AlertTriangle} color="#EF4444" />
       </div>
 
@@ -146,9 +194,10 @@ const AnalyticsPage = () => {
             <h3 className="text-lg font-bold">Class Performance Trend</h3>
             <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Weekly Average Score</span>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-80 w-full" style={{ minHeight: 240 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
+              {trendData && trendData.length > 0 ? (
+                <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
@@ -162,7 +211,10 @@ const AnalyticsPage = () => {
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
                 <Area type="monotone" dataKey="avg" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)" />
-              </AreaChart>
+                </AreaChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-400 italic">Not enough data to render trend chart.</div>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -170,23 +222,27 @@ const AnalyticsPage = () => {
         {/* Distribution Chart */}
         <div className="lg:col-span-4 bg-white p-8 rounded-3xl border shadow-sm" style={{ borderColor: TEACHER_COLORS.BORDER }}>
           <h3 className="text-lg font-bold mb-8">Grade Distribution</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={distributionData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {distributionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="h-64 w-full" style={{ minHeight: 200 }}>
+            {distributionData && distributionData.reduce((s, d) => s + (d.value || 0), 0) > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={distributionData}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 italic">No distribution data available.</div>
+            )}
           </div>
           <div className="space-y-3 mt-4">
             {distributionData.map((item, index) => (
@@ -228,7 +284,7 @@ const AnalyticsPage = () => {
                   </tr>
                 ) : (
                   riskData.map((student) => (
-                    <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={`gap-${student.id}`} className="hover:bg-slate-50 transition-colors">
                       <td className="px-8 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center font-bold text-blue-600 text-xs">
@@ -244,8 +300,17 @@ const AnalyticsPage = () => {
                           {student.risk_level}
                         </span>
                       </td>
-                      <td className="px-8 py-4 font-medium text-slate-700">{student.attendance_percentage}%</td>
-                      <td className="px-8 py-4 font-medium text-slate-700">{student.overall_score}%</td>
+                      {(() => {
+                        const perf = performanceRows.find(p => Number(p.student_id) === Number(student.student_id) || Number(p.student_id) === Number(student.id));
+                        const attendanceDisplay = perf && perf.attendance_percentage !== undefined ? `${perf.attendance_percentage}%` : 'N/A';
+                        const overallDisplay = perf ? `${Number(perf.overall_score || 0).toFixed(1)}%` : 'N/A';
+                        return (
+                          <>
+                            <td className="px-8 py-4 font-medium text-slate-700">{attendanceDisplay}</td>
+                            <td className="px-8 py-4 font-medium text-slate-700">{overallDisplay}</td>
+                          </>
+                        );
+                      })()}
                       <td className="px-8 py-4 text-xs text-slate-500 max-w-xs truncate">{student.weak_topics}</td>
                       <td className="px-8 py-4">
                         <button className="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1">

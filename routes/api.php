@@ -109,6 +109,7 @@ $router->delete('/api/materials/{id}', [\App\Controllers\MaterialController::cla
 
 // Discussion Routes
 $router->get('/api/discussions/groups', [\App\Controllers\DiscussionController::class, 'getGroups']);
+$router->post('/api/discussions/groups', [\App\Controllers\DiscussionController::class, 'createGroup']);
 $router->get('/api/discussions/groups/{id}/topics', [\App\Controllers\DiscussionController::class, 'listTopics']);
 $router->post('/api/discussions/groups/{id}/topics', [\App\Controllers\DiscussionController::class, 'createTopic']);
 $router->get('/api/discussions/topics/{id}/messages', [\App\Controllers\DiscussionController::class, 'listMessages']);
