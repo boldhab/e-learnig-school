@@ -71,6 +71,17 @@ class DiscussionService {
             throw new Exception("Failed to create discussion group.");
         }
 
+        // Create a starter thread so opening a new group immediately shows a chat topic.
+        $existingTopics = $this->topicRepo->findByGroup($group['id']);
+        if (empty($existingTopics)) {
+            $this->topicRepo->create([
+                'group_id' => $group['id'],
+                'title' => 'General Discussion',
+                'created_by' => (int) $userId,
+                'status' => 'open',
+            ]);
+        }
+
         return $group;
     }
 

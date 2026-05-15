@@ -21,11 +21,6 @@ class DiscussionGroupRepository {
             $this->db->exec("ALTER TABLE discussion_groups ADD CONSTRAINT fk_discussion_groups_class FOREIGN KEY (class_id) REFERENCES categories(id) ON DELETE CASCADE");
         }
 
-        $legacyIndexStmt = $this->db->query("SHOW INDEX FROM discussion_groups WHERE Key_name = 'course_id'");
-        if ($legacyIndexStmt->fetch()) {
-            $this->db->exec("ALTER TABLE discussion_groups DROP INDEX course_id");
-        }
-
         $compositeIndexStmt = $this->db->query("SHOW INDEX FROM discussion_groups WHERE Key_name = 'unique_course_class'");
         if (!$compositeIndexStmt->fetch()) {
             $this->db->exec("ALTER TABLE discussion_groups ADD UNIQUE KEY unique_course_class (course_id, class_id)");
@@ -75,15 +70,24 @@ class DiscussionGroupRepository {
     }
 
     public function getGroupsByStudent($classId) {
+        $visibleClassIds = [$classId];
+
+        $parentStmt = $this->db->prepare("SELECT parent_id FROM categories WHERE id = ? LIMIT 1");
+        $parentStmt->execute([$classId]);
+        $parentId = $parentStmt->fetchColumn();
+        if (!empty($parentId)) {
+            $visibleClassIds[] = (int) $parentId;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($visibleClassIds), '?'));
         $sql = "SELECT DISTINCT dg.*, c.name AS course_name, cl.name AS class_name
                 FROM discussion_groups dg
-                JOIN teacher_assignments ta ON dg.course_id = ta.course_id
                 LEFT JOIN categories c ON c.id = dg.course_id
                 LEFT JOIN categories cl ON cl.id = dg.class_id
-                WHERE ta.class_id = :class_id
-                  AND (dg.class_id = :class_id OR dg.class_id IS NULL)";
+                WHERE (dg.class_id IN ($placeholders) OR dg.class_id IS NULL)
+                ORDER BY dg.created_at DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['class_id' => $classId]);
+        $stmt->execute($visibleClassIds);
         return $stmt->fetchAll();
     }
 

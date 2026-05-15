@@ -18,11 +18,12 @@ class DiscussionController extends BaseController {
     public function getGroups(Request $request, Response $response) {
         $this->requireAuth();
         $user = $GLOBALS['auth_user'];
+        $role = $user['role_name'] ?? $user['role'] ?? '';
         
         try {
             $groups = $this->discussionService->getUserGroups(
                 $user['id'], 
-                $user['role_name'], 
+                $role, 
                 $user['class_id'] ?? null
             );
             $this->success($groups);
@@ -59,6 +60,7 @@ class DiscussionController extends BaseController {
         $this->requireRole(['ADMIN', 'TEACHER']);
         $data = HtmlSanitizer::sanitize($request->getBody());
         $user = $GLOBALS['auth_user'];
+        $role = $user['role_name'] ?? $user['role'] ?? '';
 
         try {
             $group = $this->discussionService->createGroup(
@@ -66,7 +68,7 @@ class DiscussionController extends BaseController {
                 $data['class_id'] ?? null,
                 $data['title'] ?? '',
                 $user['id'],
-                $user['role_name']
+                $role
             );
             $this->success($group, 'Discussion group created successfully', 201);
         } catch (Exception $e) {

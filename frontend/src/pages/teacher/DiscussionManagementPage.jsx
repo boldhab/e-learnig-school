@@ -102,7 +102,8 @@ const DiscussionManagementPage = () => {
   const [messages, setMessages] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
-  const [selectedSectionKey, setSelectedSectionKey] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [loading, setLoading] = useState(true);
   const [topicLoading, setTopicLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
@@ -150,7 +151,15 @@ const DiscussionManagementPage = () => {
     try {
       const response = await communicationApi.getTopics(groupId);
       const nextTopics = response.data?.data ?? response.data ?? [];
-      const normalizedTopics = Array.isArray(nextTopics) ? nextTopics : [];
+      let normalizedTopics = Array.isArray(nextTopics) ? nextTopics : [];
+
+      if (normalizedTopics.length === 0) {
+        await communicationApi.createTopic(groupId, { title: 'General Discussion' });
+        const retryResponse = await communicationApi.getTopics(groupId);
+        const retryTopics = retryResponse.data?.data ?? retryResponse.data ?? [];
+        normalizedTopics = Array.isArray(retryTopics) ? retryTopics : [];
+      }
+
       setTopics(normalizedTopics);
       setSelectedTopic((current) =>
         normalizedTopics.find((topic) => topic.id === preferredTopicId)
@@ -223,15 +232,46 @@ const DiscussionManagementPage = () => {
     });
   }, [courses, groups]);
 
-  useEffect(() => {
-    if (
-      !selectedSectionKey ||
-      !availableSectionsForGroups.some((course) => `${course.id}:${course.class_id ?? ''}` === selectedSectionKey)
-    ) {
-      const first = availableSectionsForGroups[0];
-      setSelectedSectionKey(first ? `${first.id}:${first.class_id ?? ''}` : '');
+  const availableCoursesForGroups = useMemo(() => {
+    const seen = new Map();
+
+    availableSectionsForGroups.forEach((course) => {
+      const key = String(course.id);
+      if (!seen.has(key)) {
+        seen.set(key, course);
+      }
+    });
+
+    return Array.from(seen.values());
+  }, [availableSectionsForGroups]);
+
+  const availableClassesForSelectedCourse = useMemo(() => {
+    if (!selectedCourseId) {
+      return [];
     }
-  }, [availableSectionsForGroups, selectedSectionKey]);
+
+    return availableSectionsForGroups.filter((course) => String(course.id) === selectedCourseId);
+  }, [availableSectionsForGroups, selectedCourseId]);
+
+  useEffect(() => {
+    if (!availableCoursesForGroups.some((course) => String(course.id) === selectedCourseId)) {
+      const firstCourse = availableCoursesForGroups[0];
+      const nextCourseId = firstCourse ? String(firstCourse.id) : '';
+      setSelectedCourseId(nextCourseId);
+
+      const nextClasses = availableSectionsForGroups.filter((course) => String(course.id) === nextCourseId);
+      setSelectedClassId(nextClasses[0] ? String(nextClasses[0].class_id ?? '') : '');
+      return;
+    }
+
+    if (
+      !selectedClassId ||
+      !availableClassesForSelectedCourse.some((course) => String(course.class_id ?? '') === selectedClassId)
+    ) {
+      const firstClass = availableClassesForSelectedCourse[0];
+      setSelectedClassId(firstClass ? String(firstClass.class_id ?? '') : '');
+    }
+  }, [availableClassesForSelectedCourse, availableCoursesForGroups, availableSectionsForGroups, selectedClassId, selectedCourseId]);
 
   const filteredTopics = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -249,8 +289,10 @@ const DiscussionManagementPage = () => {
   }), [groups, topics, messages]);
 
   const handleCreateGroup = async () => {
-    const course = availableSectionsForGroups.find((item) => `${item.id}:${item.class_id ?? ''}` === selectedSectionKey);
-    if (!course) {
+    const course = availableSectionsForGroups.find(
+      (item) => String(item.id) === selectedCourseId && String(item.class_id ?? '') === selectedClassId
+    );
+    if (!course || !selectedCourseId || !selectedClassId) {
       alert('Please select a course and class without an existing discussion group.');
       return;
     }
@@ -418,17 +460,36 @@ const DiscussionManagementPage = () => {
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
                   New Student Group
                 </label>
-                <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_auto]">
+                <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr_auto]">
                   <select
-                    value={selectedSectionKey}
-                    onChange={(event) => setSelectedSectionKey(event.target.value)}
+                    value={selectedCourseId}
+                    onChange={(event) => {
+                      const nextCourseId = event.target.value;
+                      setSelectedCourseId(nextCourseId);
+                      const nextClasses = availableSectionsForGroups.filter((course) => String(course.id) === nextCourseId);
+                      setSelectedClassId(nextClasses[0] ? String(nextClasses[0].class_id ?? '') : '');
+                    }}
                     className="rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
                     style={{ borderColor: TEACHER_COLORS.BORDER }}
                   >
-                    <option value="">Select course and class</option>
-                    {availableSectionsForGroups.map((course) => (
-                      <option key={`${course.id}:${course.class_id}`} value={`${course.id}:${course.class_id ?? ''}`}>
-                        {course.name} - {course.class_name || 'Class'}
+                    <option value="">Select assigned course</option>
+                    {availableCoursesForGroups.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedClassId}
+                    onChange={(event) => setSelectedClassId(event.target.value)}
+                    className="rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:ring-2"
+                    style={{ borderColor: TEACHER_COLORS.BORDER }}
+                    disabled={!selectedCourseId}
+                  >
+                    <option value="">Select assigned class</option>
+                    {availableClassesForSelectedCourse.map((course) => (
+                      <option key={`${course.id}:${course.class_id ?? ''}`} value={course.class_id ?? ''}>
+                        {course.class_name || 'Class'}
                       </option>
                     ))}
                   </select>
@@ -443,7 +504,7 @@ const DiscussionManagementPage = () => {
                   <button
                     type="button"
                     onClick={handleCreateGroup}
-                    disabled={submitting || !selectedSectionKey || availableSectionsForGroups.length === 0}
+                    disabled={submitting || !selectedCourseId || !selectedClassId || availableSectionsForGroups.length === 0}
                     className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
                   >
@@ -453,7 +514,7 @@ const DiscussionManagementPage = () => {
                 <p className="mt-2 text-xs" style={{ color: TEACHER_COLORS.TEXT_SECONDARY }}>
                   {availableSectionsForGroups.length === 0
                     ? 'All of your assigned course sections already have discussion groups.'
-                    : 'Choose one of your assigned course and class sections that does not already have a student discussion group.'}
+                    : 'Choose a course first, then select one of your assigned classes that does not already have a student discussion group.'}
                 </p>
               </div>
             ) : null}

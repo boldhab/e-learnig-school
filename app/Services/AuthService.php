@@ -31,7 +31,8 @@ class AuthService {
             'id' => $user['id'],
             'user_id' => $user['id'],
             'username' => $user['username'],
-            'role' => $user['role_name']
+            'role' => $user['role_name'],
+            'role_name' => $user['role_name']
         ];
 
         return [
@@ -42,6 +43,7 @@ class AuthService {
                 'username' => $user['username'],
                 'email' => $user['email'],
                 'role' => $user['role_name'],
+                'role_name' => $user['role_name'],
                 'class_id' => $user['class_id'] ?? null
             ]
         ];
