@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Core\Database;
+use App\Repositories\UserRepository;
 use App\Repositories\DiscussionGroupRepository;
 use App\Repositories\DiscussionTopicRepository;
 use App\Repositories\DiscussionMessageRepository;
@@ -12,11 +13,13 @@ class DiscussionService {
     protected $groupRepo;
     protected $topicRepo;
     protected $messageRepo;
+    protected $userRepo;
 
     public function __construct() {
         $this->groupRepo = new DiscussionGroupRepository();
         $this->topicRepo = new DiscussionTopicRepository();
         $this->messageRepo = new DiscussionMessageRepository();
+        $this->userRepo = new UserRepository();
     }
 
     /**
@@ -96,7 +99,11 @@ class DiscussionService {
 
         if ($role === 'STUDENT') {
             if (!$classId) {
-                return [];
+                $user = $this->userRepo->findById($userId);
+                $classId = $user['class_id'] ?? null;
+                if (!$classId) {
+                    return [];
+                }
             }
             return $this->groupRepo->getGroupsByStudent($classId);
         }
