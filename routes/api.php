@@ -84,6 +84,7 @@ $router->post('/api/categories', [\App\Controllers\CategoryController::class, 'c
 $router->get('/api/categories', [\App\Controllers\CategoryController::class, 'list']);
 $router->get('/api/courses', [\App\Controllers\CourseController::class, 'list']);
 $router->get('/api/courses/{id}/students', [\App\Controllers\CourseController::class, 'students']);
+$router->get('/api/courses/{id}/submission-stats', [\App\Controllers\CourseController::class, 'getSubmissionStats']);
 $router->get('/api/teacher/dashboard', [\App\Controllers\CourseController::class, 'dashboard']);
 
 // Assignment Routes
@@ -97,6 +98,7 @@ $router->delete('/api/assignments/{id}', [\App\Controllers\AssignmentController:
 $router->post('/api/assignments/{id}/submit', [\App\Controllers\SubmissionController::class, 'submit']);
 $router->get('/api/assignments/{id}/submissions', [\App\Controllers\SubmissionController::class, 'getSubmissionsByAssignment']);
 $router->get('/api/student/submissions', [\App\Controllers\SubmissionController::class, 'getStudentSubmissions']);
+$router->get('/api/teacher/submissions', [\App\Controllers\SubmissionController::class, 'getTeacherSubmissions']);
 
 // Grading Routes
 $router->post('/api/submissions/{id}/grade', [\App\Controllers\GradingController::class, 'grade']);
@@ -121,6 +123,9 @@ $router->delete('/api/discussions/topics/{id}', [\App\Controllers\DiscussionCont
 $router->get('/api/performance/student/stats', [\App\Controllers\PerformanceController::class, 'getStudentDashboardStats']);
 $router->get('/api/performance/student', [\App\Controllers\PerformanceController::class, 'getByStudent']);
 $router->get('/api/performance/course/{id}', [\App\Controllers\PerformanceController::class, 'getCourseData']);
+$router->get('/api/performance/course/{id}/trend', [
+    App\Controllers\PerformanceController::class, 'getCourseTrend'
+]);
 $router->get('/api/performance/gap-analysis', [\App\Controllers\GapAnalysisController::class, 'getStudentAnalysis']);
 $router->get('/api/performance/risk-report', [\App\Controllers\GapAnalysisController::class, 'getRiskReport']);
 

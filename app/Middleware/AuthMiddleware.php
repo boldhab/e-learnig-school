@@ -20,12 +20,14 @@ class AuthMiddleware {
 
         if (!$token) {
             $response->json([], 'error', 'Unauthorized: Token missing', 401);
+            exit;
         }
 
         $userData = JwtHelper::verify($token);
 
         if (!$userData) {
             $response->json([], 'error', 'Unauthorized: Invalid or expired token', 401);
+            exit;
         }
 
         // Attach user to request for later use

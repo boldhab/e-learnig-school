@@ -70,4 +70,23 @@ class SubmissionRepository {
         $stmt = $this->db->prepare($sql);
         return $stmt->execute(['id' => $id, 'status' => $status]);
     }
+
+    public function getByTeacher($teacherId) {
+        $sql = "SELECT s.*, 
+                       u.full_name as student_name, 
+                       a.title as assignment_title, 
+                       a.max_marks, 
+                       g.marks, 
+                       g.feedback, 
+                       g.published_at 
+                FROM submissions s 
+                JOIN users u ON s.student_id = u.id 
+                JOIN assignments a ON s.assignment_id = a.id 
+                LEFT JOIN grades g ON s.id = g.submission_id 
+                WHERE a.created_by = :teacher_id
+                ORDER BY s.submitted_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['teacher_id' => $teacherId]);
+        return $stmt->fetchAll();
+    }
 }

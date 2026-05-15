@@ -44,4 +44,8 @@ class SubmissionService {
     public function getAssignmentSubmissions($assignmentId) {
         return $this->submissionRepo->getByAssignment($assignmentId);
     }
+
+    public function getTeacherSubmissions($teacherId) {
+        return $this->submissionRepo->getByTeacher($teacherId);
+    }
 }

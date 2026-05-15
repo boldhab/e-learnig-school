@@ -86,6 +86,18 @@ class PerformanceService {
         return $this->performanceRepository->getCoursePerformance($courseId);
     }
 
+    /**
+     * Get aggregated trend data for a course.
+     * Returns last $points of daily averages over the past $days window.
+     */
+    public function getCoursePerformanceTrend(int $courseId, int $days = 90, int $points = 6): array {
+        $rows = $this->performanceRepository->getCoursePerformanceTrend($courseId, $days);
+        if (!is_array($rows)) return [];
+        $count = count($rows);
+        if ($count <= $points) return $rows;
+        return array_slice($rows, -$points);
+    }
+
     public function getStudentDashboardSummary(int $studentId): array {
         $db = \App\Core\Database::getInstance();
         $stats = [];

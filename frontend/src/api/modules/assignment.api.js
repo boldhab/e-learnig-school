@@ -8,6 +8,8 @@ const assignmentApi = {
   
   getAssignmentSubmissions: (id) => api.get(`assignments/${id}/submissions`),
   
+  getTeacherSubmissions: () => api.get("teacher/submissions"),
+
   gradeSubmission: (submissionId, data) => api.post(`submissions/${submissionId}/grade`, data),
 
   // Shared/Student methods

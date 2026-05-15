@@ -5,6 +5,8 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { COLORS } from '../../constants/theme';
 import notificationApi from '../../api/modules/notification.api';
 
+const isNotificationRead = (notification) => Boolean(notification?.read ?? notification?.is_read ?? false);
+
 const NotificationBell = () => {
   const { notifications, setNotifications, unreadCount, setUnreadCount } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
@@ -27,7 +29,7 @@ const NotificationBell = () => {
   const markAllRead = async () => {
     try {
       await notificationApi.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true, is_read: true })));
       setUnreadCount(0);
     } catch (e) {
       console.error('Failed to mark all read', e);
@@ -36,9 +38,9 @@ const NotificationBell = () => {
 
   const handleClickNotification = async (notif) => {
     try {
-      if (!notif.read) {
+      if (!isNotificationRead(notif)) {
         await notificationApi.markAsRead(notif.id);
-        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: 1 } : n)));
+        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true, is_read: true } : n)));
         setUnreadCount((c) => Math.max(0, c - 1));
       }
     } catch (e) {
@@ -98,7 +100,7 @@ const NotificationBell = () => {
                   <div
                     key={notif.id ?? `notif-${index}`}
                     onClick={() => handleClickNotification(notif)}
-                    className={`p-4 border-b last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.read ? 'opacity-60' : ''}`}
+                    className={`p-4 border-b last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${isNotificationRead(notif) ? 'opacity-60' : ''}`}
                   >
                     <div className="flex gap-3">
                       <div className="flex-shrink-0 pt-1">{getIcon(notif.type)}</div>

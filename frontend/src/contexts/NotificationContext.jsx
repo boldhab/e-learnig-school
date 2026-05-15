@@ -32,6 +32,12 @@ const MOCK_NOTIFICATIONS = [
   },
 ];
 
+const normalizeNotification = (notification) => ({
+  ...notification,
+  read: Boolean(notification?.read ?? notification?.is_read ?? false),
+  is_read: Boolean(notification?.is_read ?? notification?.read ?? false),
+});
+
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
@@ -42,53 +48,53 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-  // Load current notifications snapshot so the list isn't empty
-  const loadInitial = async () => {
-    try {
-      const [nRes, cRes] = await Promise.all([
-        notificationApi.getNotifications(),
-        notificationApi.getUnreadCount(),
-      ]);
-      const list = nRes?.data?.data ?? nRes?.data ?? [];
-      setNotifications(Array.isArray(list) ? list : []);
-      // backend may return { data: { unread_count: N } } or { unread_count: N }
-      const countObj = cRes?.data?.data ?? cRes?.data ?? 0;
-      const count = typeof countObj === 'object' ? (countObj.unread_count ?? countObj) : countObj;
-      setUnreadCount(Number(count) || 0);
-    } catch (err) {
-      // If the API failed and we're in DEV, populate mock notifications so UI shows example data
-      if (import.meta.env.DEV) {
-        setNotifications(MOCK_NOTIFICATIONS);
-        setUnreadCount(MOCK_NOTIFICATIONS.filter(n => !n.read).length);
+    // Load current notifications snapshot so the list isn't empty
+    const loadInitial = async () => {
+      try {
+        const [nRes, cRes] = await Promise.all([
+          notificationApi.getNotifications(),
+          notificationApi.getUnreadCount(),
+        ]);
+        const list = nRes?.data?.data ?? nRes?.data ?? [];
+        setNotifications(Array.isArray(list) ? list.map(normalizeNotification) : []);
+        // backend may return { data: { unread_count: N } } or { unread_count: N }
+        const countObj = cRes?.data?.data ?? cRes?.data ?? 0;
+        const count = typeof countObj === 'object' ? (countObj.unread_count ?? countObj) : countObj;
+        setUnreadCount(Number(count) || 0);
+      } catch (err) {
+        // If the API failed and we're in DEV, populate mock notifications so UI shows example data
+        if (import.meta.env.DEV) {
+          setNotifications(MOCK_NOTIFICATIONS.map(normalizeNotification));
+          setUnreadCount(MOCK_NOTIFICATIONS.filter(n => !n.read).length);
+        }
+        // ignore otherwise – SSE will still stream new notifications
       }
-      // ignore otherwise – SSE will still stream new notifications
-    }
-  };
-  loadInitial();
+    };
+    loadInitial();
 
     // Use Server-Sent Events (SSE) instead of Pusher
     const token = localStorage.getItem('token');
-  if (!token) return;
+    if (!token) return;
 
-  const envBaseRaw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  const envBase = String(envBaseRaw).replace(/\/+$/, '');
-  const base = envBase.endsWith('/api') ? envBase : `${envBase}/api`;
-  const sseUrl = `${base}/notifications/stream?token=${encodeURIComponent(token)}`;
-  if (import.meta.env.DEV) {
-    // Helpful for diagnosing the common "text/html" SSE error (usually wrong base URL)
-    console.debug('[SSE] Connecting to:', sseUrl);
-  }
-    
+    const envBaseRaw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const envBase = String(envBaseRaw).replace(/\/+$/, '');
+    const base = envBase.endsWith('/api') ? envBase : `${envBase}/api`;
+    const sseUrl = `${base}/notifications/stream?token=${encodeURIComponent(token)}`;
+    if (import.meta.env.DEV) {
+      // Helpful for diagnosing the common "text/html" SSE error (usually wrong base URL)
+      console.debug('[SSE] Connecting to:', sseUrl);
+    }
+
     const eventSource = new EventSource(sseUrl);
 
-        eventSource.addEventListener('notification.received', (event) => {
+    eventSource.addEventListener('notification.received', (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = normalizeNotification(JSON.parse(event.data));
         console.log('New SSE notification:', data);
         
         // Update local state
-            setNotifications(prev => [data, ...prev]);
-            setUnreadCount(prev => prev + 1);
+        setNotifications(prev => [data, ...prev]);
+        setUnreadCount(prev => prev + 1);
 
         // Trigger Toast
         showToast(data);

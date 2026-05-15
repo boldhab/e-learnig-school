@@ -9,6 +9,8 @@ const performanceApi = {
   getGapAnalysis: (courseId = '') => api.get(`performance/gap-analysis${courseId ? `?course_id=${courseId}` : ''}`),
   
   getRiskReport: () => api.get("performance/risk-report")
+  ,
+  getCourseTrend: (courseId, params = '') => api.get(`performance/course/${courseId}/trend${params ? `?${params}` : ''}`)
 };
 
 export default performanceApi;

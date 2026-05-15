@@ -33,6 +33,58 @@ class CourseController extends BaseController {
         }
     }
 
+    /**
+     * Return submission stats for a course: enrolled count, assignment count, submission count
+     */
+    public function getSubmissionStats(Request $request, Response $response, $id) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
+
+        try {
+            $db = Database::getInstance();
+
+            // student role id
+            $stmt = $db->query("SELECT id FROM roles WHERE role_name = 'STUDENT' LIMIT 1");
+            $studentRoleId = (int) $stmt->fetchColumn();
+
+            // enrolled students for the course (distinct users in classes assigned to this course)
+            $enrolledStmt = $db->prepare(<<<SQL
+SELECT COUNT(DISTINCT u.id) as enrolled_count
+FROM users u
+INNER JOIN teacher_assignments ta ON ta.class_id = u.class_id
+WHERE ta.course_id = :course_id
+  AND u.role_id = :student_role_id
+SQL
+            );
+            $enrolledStmt->execute(['course_id' => (int)$id, 'student_role_id' => $studentRoleId]);
+            $enrolledCount = (int) $enrolledStmt->fetchColumn();
+
+            // number of assignments in course
+            $assignStmt = $db->prepare("SELECT COUNT(*) FROM assignments WHERE course_id = :course_id");
+            $assignStmt->execute(['course_id' => (int)$id]);
+            $assignmentCount = (int) $assignStmt->fetchColumn();
+
+            // total submissions for course (all assignments)
+            $subStmt = $db->prepare(<<<SQL
+SELECT COUNT(*) as submission_count
+FROM submissions s
+INNER JOIN assignments a ON a.id = s.assignment_id
+WHERE a.course_id = :course_id
+SQL
+            );
+            $subStmt->execute(['course_id' => (int)$id]);
+            $submissionCount = (int) $subStmt->fetchColumn();
+
+            $this->success([
+                'enrolled_count' => $enrolledCount,
+                'assignment_count' => $assignmentCount,
+                'submission_count' => $submissionCount,
+                'submission_rate' => ($enrolledCount > 0 && $assignmentCount > 0) ? round(($submissionCount / ($enrolledCount * $assignmentCount)) * 100, 1) : 0
+            ]);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
     public function dashboard(Request $request, Response $response) {
         $this->requireRole('TEACHER');
 

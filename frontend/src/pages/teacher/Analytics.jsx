@@ -17,6 +17,7 @@ import {
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
 import performanceApi from '../../api/modules/performance.api';
 import contentApi from '../../api/modules/content.api';
+import toast from 'react-hot-toast';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -69,9 +70,14 @@ const AnalyticsPage = () => {
 
         if (nextCourses.length > 0) {
           setSelectedCourseId(nextCourses[0].id);
+        } else {
+          setSelectedCourseId('');
         }
       } catch (error) {
-        console.error("Failed to fetch initial analytics data:", error);
+        const resp = error?.response?.data;
+        console.error("Failed to fetch initial analytics data:", resp || error.message || error);
+        const msg = resp?.message || resp?.status || error.message || 'Failed to load analytics data. Try reloading.';
+        toast.error(msg);
         setCourses([]);
         setRiskData([]);
       } finally {
@@ -89,6 +95,7 @@ const AnalyticsPage = () => {
         setPerformanceData(toArray(unwrapApiData(res)));
       } catch (error) {
         console.error("Failed to fetch course performance:", error);
+        toast.error('Failed to load course performance.');
         setPerformanceData([]);
       }
     };
@@ -122,26 +129,31 @@ const AnalyticsPage = () => {
   };
 
   const computeTrend = (rows, maxPoints = 6) => {
-    // Group by date (generated_at) and compute average overall_score per date
+    // Group by UTC date (avoid timezone shift) and compute average overall_score per date
     const map = new Map();
     rows.forEach((r) => {
       const dt = r.generated_at || r.created_at || null;
       if (!dt) return;
       const d = new Date(dt);
       if (isNaN(d)) return;
-      // Use ISO date (YYYY-MM-DD) as key
-      const key = d.toISOString().slice(0, 10);
-      const cur = map.get(key) || { sum: 0, count: 0, date: d };
+      // Use UTC date components to avoid local timezone shifts
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const cur = map.get(key) || { sum: 0, count: 0, dateKey: key };
       cur.sum += Number(r.overall_score || 0);
       cur.count += 1;
       map.set(key, cur);
     });
 
-    // Sort dates ascending and pick last `maxPoints`
+    // Sort keys ascending and pick last `maxPoints`
     const sorted = Array.from(map.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
     const last = sorted.slice(-maxPoints);
 
-    return last.map(([key, v]) => ({ name: new Date(key).toLocaleDateString(), avg: v.count ? +(v.sum / v.count).toFixed(1) : 0 }));
+    return last.map(([key, v]) => {
+      // Create a UTC date for display
+      const [y, m, d] = key.split('-').map((n) => Number(n));
+      const date = new Date(Date.UTC(y, m - 1, d));
+      return { name: date.toLocaleDateString(), avg: v.count ? +(v.sum / v.count).toFixed(1) : 0 };
+    });
   };
 
   const performanceRows = toArray(performanceData);
@@ -166,16 +178,22 @@ const AnalyticsPage = () => {
 
         <div className="flex items-center gap-3">
           <Filter size={20} className="text-slate-400" />
-          <select
-            value={selectedCourseId}
-            onChange={(e) => setSelectedCourseId(e.target.value)}
-            className="px-4 py-2 rounded-xl border bg-white focus:ring-2 focus:ring-blue-500/20 outline-none font-medium shadow-sm"
-            style={{ borderColor: TEACHER_COLORS.BORDER }}
-          >
-            {courses.map(course => (
-              <option key={`course-${course.id}`} value={course.id}>{course.name}</option>
-            ))}
-          </select>
+          {courses && courses.length > 0 ? (
+            <select
+              value={selectedCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="px-4 py-2 rounded-xl border bg-white focus:ring-2 focus:ring-blue-500/20 outline-none font-medium shadow-sm"
+              style={{ borderColor: TEACHER_COLORS.BORDER }}
+            >
+              {courses.map(course => (
+                <option key={`course-${course.id}`} value={course.id}>{course.name}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="px-4 py-2 rounded-xl border bg-white text-slate-500" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+              No courses assigned
+            </div>
+          )}
         </div>
       </header>
 
@@ -194,8 +212,8 @@ const AnalyticsPage = () => {
             <h3 className="text-lg font-bold">Class Performance Trend</h3>
             <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Weekly Average Score</span>
           </div>
-          <div className="h-80 w-full" style={{ minHeight: 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <div className="h-80 w-full" style={{ minHeight: 240 }}>
+            <ResponsiveContainer width="100%" height={300}>
               {trendData && trendData.length > 0 ? (
                 <AreaChart data={trendData}>
                 <defs>
@@ -224,7 +242,7 @@ const AnalyticsPage = () => {
           <h3 className="text-lg font-bold mb-8">Grade Distribution</h3>
           <div className="h-64 w-full" style={{ minHeight: 200 }}>
             {distributionData && distributionData.reduce((s, d) => s + (d.value || 0), 0) > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie
                     data={distributionData}

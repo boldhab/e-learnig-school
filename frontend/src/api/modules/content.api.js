@@ -20,6 +20,8 @@ const contentApi = {
     return api.get(url);
   },
 
+  getCourseSubmissionStats: (courseId) => api.get(`courses/${courseId}/submission-stats`),
+
   uploadMaterial: (data) =>
     api.post("materials/upload", data, {
       headers: { "Content-Type": "multipart/form-data" },

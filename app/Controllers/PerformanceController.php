@@ -60,6 +60,21 @@ class PerformanceController extends BaseController {
         }
     }
 
+    public function getCourseTrend(Request $request, Response $response, $id) {
+        $this->requireRole(['TEACHER', 'ADMIN']);
+
+        // Allow optional query params: days, points
+        $days = isset($_GET['days']) ? (int)$_GET['days'] : 90;
+        $points = isset($_GET['points']) ? (int)$_GET['points'] : 6;
+
+        try {
+            $trend = $this->performanceService->getCoursePerformanceTrend((int)$id, $days, $points);
+            $this->success($trend, 'Course trend retrieved');
+        } catch (Exception $e) {
+            $this->error($e->getMessage(), 400);
+        }
+    }
+
     public function getStudentDashboardStats(Request $request, Response $response) {
         $this->requireRole('STUDENT');
         $studentId = $GLOBALS['auth_user']['id'];

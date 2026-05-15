@@ -10,8 +10,11 @@ import {
   MessageSquare,
   Clock,
   User,
+  Loader2,
 } from 'lucide-react';
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
+import assignmentApi from '../../api/modules/assignment.api';
+import toast from 'react-hot-toast';
 
 // Submission Item (Left Panel)
 const SubmissionItem = ({ submission, isSelected, onSelect }) => (
@@ -29,26 +32,29 @@ const SubmissionItem = ({ submission, isSelected, onSelect }) => (
       <div
         className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
         style={{
-          backgroundColor: submission.graded ? TEACHER_COLORS.SUCCESS : TEACHER_COLORS.WARNING,
+          backgroundColor: submission.status === 'graded' ? TEACHER_COLORS.SUCCESS : TEACHER_COLORS.WARNING,
         }}
       >
-        {submission.name.slice(0, 2).toUpperCase()}
+        {submission.student_name?.slice(0, 2).toUpperCase() || 'UN'}
       </div>
       <div className="flex-1 min-w-0">
         <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-medium truncate">
-          {submission.name}
+          {submission.student_name}
+        </p>
+        <p style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} className="text-xs truncate font-semibold mb-1">
+          {submission.assignment_title}
         </p>
         <div className="flex items-center gap-2 mt-1">
           <Clock size={12} style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} />
           <span style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-xs">
-            {submission.submitted}
+            {new Date(submission.submitted_at || submission.created_at).toLocaleString()}
           </span>
         </div>
-        {submission.graded && (
+        {submission.status === 'graded' && (
           <div className="flex items-center gap-1 mt-1">
             <Check size={12} style={{ color: TEACHER_COLORS.SUCCESS }} />
             <span style={{ color: TEACHER_COLORS.SUCCESS }} className="text-xs font-medium">
-              Graded
+              Graded ({submission.marks}/{submission.max_marks})
             </span>
           </div>
         )}
@@ -60,7 +66,7 @@ const SubmissionItem = ({ submission, isSelected, onSelect }) => (
 // Submission Viewer (Center Panel)
 const SubmissionViewer = ({ submission }) => (
   <motion.div
-    className="bg-white rounded-xl border p-6"
+    className="bg-white rounded-xl border p-6 h-full"
     style={{ borderColor: TEACHER_COLORS.BORDER }}
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -72,45 +78,44 @@ const SubmissionViewer = ({ submission }) => (
           className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
           style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
         >
-          {submission.name.slice(0, 2).toUpperCase()}
+          {submission.student_name?.slice(0, 2).toUpperCase() || 'UN'}
         </div>
         <div>
-          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold">
-            {submission.name}
+          <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold text-lg">
+            {submission.student_name}
           </p>
           <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="text-sm">
-            Submitted: {submission.submitted}
+            Submitted: {new Date(submission.submitted_at || submission.created_at).toLocaleString()}
           </p>
+          <p className="text-sm text-blue-600 mt-1 font-semibold">{submission.assignment_title}</p>
         </div>
       </div>
     </div>
 
     {/* Submission Content */}
     <div className="mb-6">
-      <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-3">
-        Submission Content
+      <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-3 flex items-center justify-between">
+        Submission Text
       </h3>
       <div
-        className="p-4 rounded-lg text-sm min-h-[200px]"
+        className="p-4 rounded-lg text-sm min-h-[200px] whitespace-pre-wrap"
         style={{
           backgroundColor: TEACHER_COLORS.BACKGROUND,
           color: TEACHER_COLORS.TEXT_PRIMARY,
         }}
       >
-        <p>{submission.content}</p>
+        {submission.answer_text || 'No text provided.'}
       </div>
     </div>
 
     {/* Attached Files */}
-    {submission.files && submission.files.length > 0 && (
+    {submission.submission_file_url && (
       <div>
         <h3 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold mb-3">
-          Attachments ({submission.files.length})
+          Attachments (1)
         </h3>
         <div className="space-y-2">
-          {submission.files.map((file, index) => (
             <motion.div
-              key={index}
               className="flex items-center justify-between p-3 rounded-lg border"
               style={{
                 borderColor: TEACHER_COLORS.BORDER,
@@ -118,17 +123,25 @@ const SubmissionViewer = ({ submission }) => (
               }}
               whileHover={{ scale: 1.02 }}
             >
-              <span style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm">
-                {file}
-              </span>
-              <motion.button
-                className="p-2 rounded hover:bg-gray-200 transition-colors"
-                whileHover={{ scale: 1.1 }}
-              >
-                <Download size={16} style={{ color: TEACHER_COLORS.PRIMARY_BLUE }} />
-              </motion.button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                  <Download size={16} />
+                </div>
+                <span style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm font-medium">
+                  Student Attachment
+                </span>
+              </div>
+              <a href={submission.submission_file_url} target="_blank" rel="noopener noreferrer">
+                <motion.button
+                  className="px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors shadow-sm"
+                  style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  View File
+                </motion.button>
+              </a>
             </motion.div>
-          ))}
         </div>
       </div>
     )}
@@ -139,7 +152,20 @@ const SubmissionViewer = ({ submission }) => (
 const GradingPanel = ({ submission, onPublish }) => {
   const [marks, setMarks] = useState(submission.marks || 0);
   const [feedback, setFeedback] = useState(submission.feedback || '');
-  const [maxMarks] = useState(100);
+  const [maxMarks, setMaxMarks] = useState(submission.max_marks || 100);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMarks(submission.marks || 0);
+    setFeedback(submission.feedback || '');
+    setMaxMarks(submission.max_marks || 100);
+  }, [submission]);
+
+  const handlePublishClick = async () => {
+    setSubmitting(true);
+    await onPublish(marks, feedback);
+    setSubmitting(false);
+  };
 
   return (
     <motion.div
@@ -148,6 +174,15 @@ const GradingPanel = ({ submission, onPublish }) => {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
     >
+      <div className="mb-4 flex items-center justify-between">
+         <h3 className="font-bold text-lg" style={{ color: TEACHER_COLORS.TEXT_PRIMARY }}>Grading</h3>
+         {submission.status === 'graded' && (
+            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wide">
+                Graded
+            </span>
+         )}
+      </div>
+
       {/* Marks Input */}
       <div className="mb-6">
         <label style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="block text-sm font-bold mb-2">
@@ -158,19 +193,18 @@ const GradingPanel = ({ submission, onPublish }) => {
             type="number"
             value={marks}
             onChange={(e) => setMarks(Math.min(maxMarks, Math.max(0, Number(e.target.value))))}
-            className="flex-1 px-4 py-2 rounded-lg border outline-none"
+            className="flex-1 px-4 py-2 rounded-lg border outline-none font-bold text-lg text-center focus:ring-2 focus:ring-blue-500/20 transition-all"
             style={{ borderColor: TEACHER_COLORS.BORDER }}
             min="0"
             max={maxMarks}
           />
-          <span style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="flex items-center">
+          <span style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="flex items-center text-lg font-bold">
             / {maxMarks}
           </span>
         </div>
         {/* Marks Bar */}
         <div
-          className="h-2 rounded-full overflow-hidden mt-3"
-          style={{ backgroundColor: TEACHER_COLORS.BACKGROUND }}
+          className="h-2 rounded-full overflow-hidden mt-3 bg-slate-100"
         >
           <motion.div
             className="h-full"
@@ -189,14 +223,14 @@ const GradingPanel = ({ submission, onPublish }) => {
       </div>
 
       {/* Feedback Textarea */}
-      <div className="mb-6 flex-1">
+      <div className="mb-6 flex-1 flex flex-col">
         <label style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="block text-sm font-bold mb-2">
           Feedback
         </label>
         <textarea
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
-          className="w-full h-full p-3 rounded-lg border resize-none outline-none"
+          className="w-full flex-1 p-3 rounded-lg border resize-none outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-h-[120px]"
           style={{
             borderColor: TEACHER_COLORS.BORDER,
             color: TEACHER_COLORS.TEXT_PRIMARY,
@@ -206,22 +240,21 @@ const GradingPanel = ({ submission, onPublish }) => {
       </div>
 
       {/* Rubric Sections */}
-      <div className="mb-6 pb-6 border-t" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+      <div className="mb-6 pb-6 border-t pt-4" style={{ borderColor: TEACHER_COLORS.BORDER }}>
         <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-sm font-bold mb-3">
           Quick Comments
         </p>
-        <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           {['Excellent work!', 'Good effort', 'Needs improvement', 'Missing parts'].map((comment) => (
             <motion.button
               key={comment}
-              className="w-full p-2 rounded-lg text-sm transition-all text-left"
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all border hover:border-blue-400 hover:text-blue-600"
               style={{
                 backgroundColor: TEACHER_COLORS.BACKGROUND,
-                color: TEACHER_COLORS.TEXT_PRIMARY,
+                color: TEACHER_COLORS.TEXT_SECONDARY,
+                borderColor: TEACHER_COLORS.BORDER,
               }}
-              whileHover={{
-                backgroundColor: `${TEACHER_COLORS.PRIMARY_BLUE}20`,
-              }}
+              whileHover={{ scale: 1.05 }}
               onClick={() => setFeedback(feedback + (feedback ? '\n' : '') + comment)}
             >
               {comment}
@@ -231,28 +264,17 @@ const GradingPanel = ({ submission, onPublish }) => {
       </div>
 
       {/* Action Buttons */}
-      <div className="space-y-2">
+      <div className="space-y-3 mt-auto">
         <motion.button
-          className="w-full py-3 rounded-lg font-medium text-white flex items-center justify-center gap-2"
-          style={{ backgroundColor: TEACHER_COLORS.SUCCESS }}
+          className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
+          style={{ backgroundColor: TEACHER_COLORS.PRIMARY_BLUE }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => onPublish(marks, feedback)}
+          onClick={handlePublishClick}
+          disabled={submitting}
         >
-          <Check size={18} />
-          Publish Grade
-        </motion.button>
-        <motion.button
-          className="w-full py-3 rounded-lg font-medium transition-all"
-          style={{
-            backgroundColor: TEACHER_COLORS.BACKGROUND,
-            color: TEACHER_COLORS.TEXT_PRIMARY,
-          }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <MessageSquare size={18} className="inline mr-2" />
-          Save Draft
+          {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+          {submission.status === 'graded' ? 'Update Grade' : 'Publish Grade'}
         </motion.button>
       </div>
     </motion.div>
@@ -261,112 +283,128 @@ const GradingPanel = ({ submission, onPublish }) => {
 
 const TeacherGrading = () => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const submissions = [
-    {
-      id: 1,
-      name: 'Zainab Hassan',
-      submitted: '2 hours ago',
-      graded: false,
-      marks: 0,
-      feedback: '',
-      content: 'I learned about quadratic equations by practicing several problems. First, I solved them using factorization, then using the quadratic formula. I found that the quadratic formula is more reliable when factorization is difficult.',
-      files: ['Solution.pdf', 'Work_in_Progress.docx'],
-    },
-    {
-      id: 2,
-      name: 'Ahmed Ibrahim',
-      submitted: '4 hours ago',
-      graded: true,
-      marks: 85,
-      feedback: 'Great work! Your solution was clear and correct. Well done!',
-      content: 'My approach was to first identify the coefficients a, b, and c. Then I used the quadratic formula to find the roots. The solution method was systematic and well-organized.',
-      files: ['Solution.pdf'],
-    },
-    {
-      id: 3,
-      name: 'Fatima Yusuf',
-      submitted: '6 hours ago',
-      graded: false,
-      marks: 0,
-      feedback: '',
-      content: 'I solved the quadratic equations by completing the square. This method helps me understand the vertex form better. I verified my solutions by substituting back into the original equation.',
-      files: ['Solution.pdf', 'Verification.xlsx'],
-    },
-    {
-      id: 4,
-      name: 'Karim Ali',
-      submitted: '1 day ago',
-      graded: true,
-      marks: 92,
-      feedback: 'Excellent! Your solutions are accurate and your explanations are clear. Keep it up!',
-      content: 'I used three different methods to solve these equations and compared the results. All methods gave the same solutions, which shows the equations are solved correctly.',
-      files: ['Solution.pdf', 'Comparative_Analysis.docx'],
-    },
-  ];
-
-  useEffect(() => {
-    if (!selectedSubmission && submissions.length > 0) {
-      setSelectedSubmission(submissions[0]);
+  const fetchSubmissions = async () => {
+    try {
+      setLoading(true);
+      const res = await assignmentApi.getTeacherSubmissions();
+      const data = res.data?.data ?? res.data ?? [];
+      setSubmissions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch teacher submissions:", error);
+      toast.error("Failed to load submissions");
+    } finally {
+      setLoading(false);
     }
-  }, [selectedSubmission, submissions]);
-
-  const handlePublish = (marks, feedback) => {
-    alert(`Published grade: ${marks}/100\nFeedback: ${feedback}`);
   };
 
+  useEffect(() => {
+    fetchSubmissions();
+  }, []);
+
+  useEffect(() => {
+    // Select first submission automatically if none selected or the selected one isn't in the new list
+    if (submissions.length > 0) {
+        if (!selectedSubmission || !submissions.find(s => s.id === selectedSubmission.id)) {
+            setSelectedSubmission(submissions[0]);
+        } else {
+            // Update selected submission data if it was updated
+            setSelectedSubmission(submissions.find(s => s.id === selectedSubmission.id));
+        }
+    } else {
+        setSelectedSubmission(null);
+    }
+  }, [submissions]);
+
+  const handlePublish = async (marks, feedback) => {
+    if (!selectedSubmission) return;
+    try {
+      await assignmentApi.gradeSubmission(selectedSubmission.id, { marks, feedback });
+      toast.success("Grade published successfully");
+      fetchSubmissions(); // refresh list
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to publish grade");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
+        <p className="text-slate-500 font-medium">Loading submissions...</p>
+      </div>
+    );
+  }
+
   return (
-    <motion.div className="p-8">
+    <motion.div className="p-8 max-w-[1600px] mx-auto">
       {/* Header */}
       <motion.div
-        className="mb-6"
+        className="mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-bold">
-          Grade Submissions
+        <h1 style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="text-3xl font-extrabold tracking-tight">
+          Global Grading Inbox
         </h1>
-        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2">
-          Mathematics 101 - Quadratic Equations Practice
+        <p style={{ color: TEACHER_COLORS.TEXT_SECONDARY }} className="mt-2 text-lg">
+          Review and grade all pending submissions across your courses.
         </p>
       </motion.div>
 
-      {/* Main Grading Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
-        {/* Submissions List - Left Panel */}
-        <motion.div
-          className="lg:col-span-1 bg-white rounded-xl border overflow-y-auto"
-          style={{ borderColor: TEACHER_COLORS.BORDER }}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <div className="p-4 border-b sticky top-0 bg-white" style={{ borderColor: TEACHER_COLORS.BORDER }}>
-            <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold">
-              Submissions ({submissions.length})
-            </p>
+      {submissions.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-dashed p-16 text-center max-w-3xl mx-auto shadow-sm">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Check size={32} className="text-blue-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">All caught up!</h3>
+            <p className="text-slate-500">There are no submissions waiting to be graded at the moment.</p>
           </div>
-          {submissions.map((submission) => (
-            <SubmissionItem
-              key={submission.id}
-              submission={submission}
-              isSelected={selectedSubmission?.id === submission.id}
-              onSelect={setSelectedSubmission}
-            />
-          ))}
-        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-[calc(100vh-200px)] min-h-[600px]">
+            {/* Submissions List - Left Panel */}
+            <motion.div
+            className="lg:col-span-1 bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm"
+            style={{ borderColor: TEACHER_COLORS.BORDER }}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            >
+            <div className="p-5 border-b bg-slate-50 flex items-center justify-between" style={{ borderColor: TEACHER_COLORS.BORDER }}>
+                <p style={{ color: TEACHER_COLORS.TEXT_PRIMARY }} className="font-bold text-sm uppercase tracking-wider">
+                Submissions
+                </p>
+                <span className="bg-blue-100 text-blue-700 py-1 px-3 rounded-full text-xs font-bold">
+                    {submissions.length} Total
+                </span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {submissions.map((submission) => (
+                <SubmissionItem
+                    key={submission.id}
+                    submission={submission}
+                    isSelected={selectedSubmission?.id === submission.id}
+                    onSelect={setSelectedSubmission}
+                />
+                ))}
+            </div>
+            </motion.div>
 
-        {/* Submission Viewer - Center Panel */}
-        <motion.div className="lg:col-span-2 overflow-y-auto">
-          {selectedSubmission && <SubmissionViewer submission={selectedSubmission} />}
-        </motion.div>
+            {/* Submission Viewer - Center Panel */}
+            <motion.div className="lg:col-span-2 overflow-y-auto custom-scrollbar">
+            {selectedSubmission && <SubmissionViewer submission={selectedSubmission} />}
+            </motion.div>
 
-        {/* Grading Panel - Right Panel */}
-        <motion.div className="lg:col-span-1">
-          {selectedSubmission && (
-            <GradingPanel submission={selectedSubmission} onPublish={handlePublish} />
-          )}
-        </motion.div>
-      </div>
+            {/* Grading Panel - Right Panel */}
+            <motion.div className="lg:col-span-1 h-full">
+            {selectedSubmission && (
+                <GradingPanel submission={selectedSubmission} onPublish={handlePublish} />
+            )}
+            </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 };

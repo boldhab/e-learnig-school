@@ -52,4 +52,15 @@ class SubmissionController extends BaseController {
             $this->error($e->getMessage());
         }
     }
+
+    public function getTeacherSubmissions(Request $request, Response $response) {
+        $this->requireRole(['ADMIN', 'TEACHER']);
+        try {
+            $teacherId = $GLOBALS['auth_user']['id'];
+            $submissions = $this->submissionService->getTeacherSubmissions($teacherId);
+            $this->success($submissions);
+        } catch (Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
 }

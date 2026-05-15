@@ -63,6 +63,24 @@ class PerformanceRepository {
         return $stmt->fetchAll();
     }
 
+    /**
+     * Get aggregated course performance grouped by date (day).
+     * Returns rows with keys: day (YYYY-MM-DD), avg_score, cnt
+     */
+    public function getCoursePerformanceTrend(int $courseId, int $days = 90): array {
+        $sql = "SELECT DATE(generated_at) as day, AVG(overall_score) as avg_score, COUNT(*) as cnt
+                FROM performance_reports
+                WHERE course_id = :course_id AND generated_at >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+                GROUP BY day
+                ORDER BY day ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':course_id', $courseId, PDO::PARAM_INT);
+        $stmt->bindValue(':days', $days, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getAggregateGrades(int $studentId, int $courseId): array {
         $sql = "SELECT 
                     a.title as assignment_title, 

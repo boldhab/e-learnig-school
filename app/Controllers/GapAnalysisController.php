@@ -71,7 +71,9 @@ class GapAnalysisController extends BaseController {
             $records = $this->gapAnalysisService->getHighRiskStudents();
             $this->success($records, 'Risk report retrieved');
         } catch (Exception $e) {
-            $this->error($e->getMessage(), 400);
+            // Log the exception for debugging and return message in response (temporary)
+            error_log("getRiskReport error: " . $e->getMessage());
+            $this->error('Failed to retrieve risk report', 400, ['exception' => $e->getMessage()]);
         }
     }
 }

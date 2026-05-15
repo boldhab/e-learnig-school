@@ -1,5 +1,4 @@
 import axios from 'axios';
-import pusher from '../services/socket';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
@@ -16,10 +15,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add Pusher Socket ID to exclude sender from broadcasts
-    if (pusher && pusher.connection && pusher.connection.socket_id) {
-      config.headers['X-Socket-ID'] = pusher.connection.socket_id;
-    }
+
 
     return config;
   },
