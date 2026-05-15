@@ -39,6 +39,10 @@ class NotificationService {
         return $this->notificationRepo->markAllAsRead($userId);
     }
 
+    public function deleteNotification(int $id, int $userId): bool {
+        return $this->notificationRepo->delete($id, $userId);
+    }
+
     // --- Automated Notifications Helpers ---
 
     // Generic helper for legacy calls from Module F

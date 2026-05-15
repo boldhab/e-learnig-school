@@ -65,4 +65,19 @@ class NotificationController extends BaseController {
             $this->error($e->getMessage(), 400);
         }
     }
+
+    public function delete(Request $request, Response $response, $id) {
+        $this->requireAuth();
+
+        try {
+            $success = $this->notificationService->deleteNotification((int)$id, $GLOBALS['auth_user']['id']);
+            if ($success) {
+                $this->success([], 'Notification deleted');
+            } else {
+                $this->error('Notification not found or access denied', 404);
+            }
+        } catch (Exception $e) {
+            $this->error($e->getMessage(), 400);
+        }
+    }
 }

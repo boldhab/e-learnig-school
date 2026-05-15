@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNotifications } from '../../contexts/NotificationContext';
+import notificationApi from '../../api/modules/notification.api';
 import { motion } from 'framer-motion';
 import {
   Bell,
@@ -159,72 +161,7 @@ const NotificationTabs = ({ activeTab, setActiveTab, counts }) => (
 
 // Main Notifications Page
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'assignment',
-      title: 'React Project - Upcoming Deadline',
-      message: 'Your React Component Library assignment is due in 2 days. Submit your work now!',
-      time: '1 hour ago',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'grade',
-      title: 'Assignment Graded - Algorithm Analysis',
-      message: 'Your Algorithm Analysis paper has been graded. Score: 95/100. Excellent work!',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'announcement',
-      title: 'New Course Material Available',
-      message: 'Prof. John Smith has uploaded new lecture notes for Web Development.',
-      time: '3 hours ago',
-      read: true,
-    },
-    {
-      id: 4,
-      type: 'discussion',
-      title: 'New Reply to Your Discussion',
-      message: 'Your comment on "React Hooks Best Practices" has received 3 new replies.',
-      time: '5 hours ago',
-      read: false,
-    },
-    {
-      id: 5,
-      type: 'alert',
-      title: 'Attendance Alert',
-      message: 'Your attendance in Database Design is below 80%. Please contact your instructor.',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: 6,
-      type: 'assignment',
-      title: 'Database Schema Assignment Submitted',
-      message: 'Your assignment has been successfully submitted. Waiting for grading.',
-      time: '2 days ago',
-      read: true,
-    },
-    {
-      id: 7,
-      type: 'grade',
-      title: 'Midterm Exam Results Posted',
-      message: 'Your Data Structures midterm exam has been graded. Score: 88/100',
-      time: '3 days ago',
-      read: true,
-    },
-    {
-      id: 8,
-      type: 'announcement',
-      title: 'Class Cancelled - Database Design',
-      message: 'The Database Design class on May 15 has been cancelled. Will be rescheduled.',
-      time: '4 days ago',
-      read: true,
-    },
-  ]);
+  const { notifications, setNotifications, unreadCount, setUnreadCount } = useNotifications();
 
   const [activeTab, setActiveTab] = useState('all');
 
@@ -238,26 +175,48 @@ const NotificationsPage = () => {
 
   // Count notifications by type
   const counts = {
-    assignment: notifications.filter((n) => n.type === 'assignment').length,
-    grade: notifications.filter((n) => n.type === 'grade').length,
-    discussion: notifications.filter((n) => n.type === 'discussion').length,
-    announcement: notifications.filter((n) => n.type === 'announcement').length,
+    assignment: (notifications || []).filter((n) => n.type === 'assignment').length,
+    grade: (notifications || []).filter((n) => n.type === 'grade').length,
+    discussion: (notifications || []).filter((n) => n.type === 'discussion').length,
+    announcement: (notifications || []).filter((n) => n.type === 'announcement').length,
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
   const handleDelete = (id) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
+    // Call backend to delete, optimistic UI removal
+    const wasUnread = (notifications || []).some((n) => n.id === id && !n.read);
+    setNotifications((prev) => (prev || []).filter((n) => n.id !== id));
+    if (wasUnread) setUnreadCount((c) => Math.max(0, (c || 0) - 1));
+    notificationApi.delete(id).catch(() => {
+      // Revert on failure: refetch notifications (simple strategy)
+      notificationApi.getNotifications().then((res) => {
+        const list = res?.data?.data ?? res?.data ?? [];
+        setNotifications(Array.isArray(list) ? list : []);
+      }).catch(() => {});
+    });
   };
 
   const handleMarkRead = (id) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    // Optimistic update + backend call; update unread count
+    setNotifications((prev) => {
+      const wasUnread = (prev || []).some((n) => n.id === id && !n.read);
+      const next = (prev || []).map((n) => (n.id === id ? { ...n, read: true } : n));
+      if (wasUnread) setUnreadCount((c) => Math.max(0, (c || 0) - 1));
+      return next;
+    });
+    notificationApi.markAsRead(id).catch(() => {
+      // Revert on failure
+      setNotifications((prev) => (prev || []).map((n) => (n.id === id ? { ...n, read: false } : n)));
+      setUnreadCount((c) => (c || 0) + 1);
+    });
   };
 
   const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => (prev || []).map((n) => ({ ...n, read: true })));
+    // Clear unread count locally
+    setUnreadCount(0);
+    notificationApi.markAllAsRead().catch(() => {
+      // On failure we could re-fetch; skipping revert for now
+    });
   };
 
   return (

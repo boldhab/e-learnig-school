@@ -4,6 +4,34 @@ import { useAuth } from './AuthContext';
 import { Bell, Info, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
 import notificationApi from '../api/modules/notification.api';
 
+// Mock notifications used in DEV when backend is not available
+const MOCK_NOTIFICATIONS = [
+  {
+    id: 1,
+    type: 'assignment',
+    title: 'React Project - Upcoming Deadline',
+    message: 'Your React Component Library assignment is due in 2 days. Submit your work now!',
+    time: '1 hour ago',
+    read: false,
+  },
+  {
+    id: 2,
+    type: 'grade',
+    title: 'Assignment Graded - Algorithm Analysis',
+    message: 'Your Algorithm Analysis paper has been graded. Score: 95/100. Excellent work!',
+    time: '2 hours ago',
+    read: false,
+  },
+  {
+    id: 3,
+    type: 'announcement',
+    title: 'New Course Material Available',
+    message: 'Prof. John Smith has uploaded new lecture notes for Web Development.',
+    time: '3 hours ago',
+    read: true,
+  },
+];
+
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
@@ -28,7 +56,12 @@ export const NotificationProvider = ({ children }) => {
       const count = typeof countObj === 'object' ? (countObj.unread_count ?? countObj) : countObj;
       setUnreadCount(Number(count) || 0);
     } catch (err) {
-      // ignore – SSE will still stream new notifications
+      // If the API failed and we're in DEV, populate mock notifications so UI shows example data
+      if (import.meta.env.DEV) {
+        setNotifications(MOCK_NOTIFICATIONS);
+        setUnreadCount(MOCK_NOTIFICATIONS.filter(n => !n.read).length);
+      }
+      // ignore otherwise – SSE will still stream new notifications
     }
   };
   loadInitial();

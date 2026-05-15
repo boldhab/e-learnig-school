@@ -170,6 +170,8 @@ $router->get('/api/notifications', [NotificationController::class, 'getNotificat
 $router->get('/api/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
 $router->put('/api/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 $router->put('/api/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+// Delete notification (owned by the authenticated user)
+$router->delete('/api/notifications/{id}/delete', [NotificationController::class, 'delete']);
 
 // Announcement Routes
 $router->post('/api/announcements/create', [AnnouncementController::class, 'create']);
