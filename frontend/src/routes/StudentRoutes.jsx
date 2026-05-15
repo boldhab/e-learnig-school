@@ -9,6 +9,7 @@ import Grades from '../pages/student/Grades';
 import Attendance from '../pages/student/Attendance';
 import Notifications from '../pages/student/Notifications';
 import GuidePage from '../pages/student/GuidePage';
+import ProfilePage from '../pages/student/ProfilePage';
 
 const StudentRoutes = () => {
   return (
@@ -22,6 +23,7 @@ const StudentRoutes = () => {
         <Route path="grades" element={<Grades />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="guide" element={<GuidePage />} />
         <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
       </Routes>
