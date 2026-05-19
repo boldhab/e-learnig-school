@@ -98,4 +98,41 @@ class PerformanceRepository {
         ]);
         return $stmt->fetchAll();
     }
+
+    /**
+     * Get assignments in a course that the student has not submitted.
+     */
+    public function getUnsubmittedAssignments(int $studentId, int $courseId): array {
+        $sql = "SELECT a.title 
+                FROM assignments a
+                LEFT JOIN submissions s ON a.id = s.assignment_id AND s.student_id = :student_id
+                WHERE a.course_id = :course_id AND s.id IS NULL";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'student_id' => $studentId,
+            'course_id' => $courseId
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Get assignments that have been submitted but are not graded yet.
+     */
+    public function getUngradedSubmissions(int $studentId, int $courseId): array {
+        $sql = "SELECT a.title 
+                FROM submissions s
+                JOIN assignments a ON a.id = s.assignment_id
+                WHERE s.student_id = :student_id 
+                  AND a.course_id = :course_id 
+                  AND s.status = 'pending'";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'student_id' => $studentId,
+            'course_id' => $courseId
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
+

@@ -22,43 +22,75 @@ class GapAnalysisService {
     }
 
     public function generateAnalysis(int $studentId, int $courseId, int $generatedBy): array {
-        // We need overall performance score and attendance percentage
-        // Instead of calculating from scratch, we can look for the latest performance report,
-        // or recalculate to be safe. We will use the calculate Attendance and average grades directly here or rely on latest performance.
-        
         $attendancePercentage = $this->attendanceRepository->calculateAttendancePercentage($studentId, $courseId);
         
         $grades = $this->performanceRepository->getAggregateGrades($studentId, $courseId);
         $totalEarned = 0;
         $totalMax = 0;
+        $weakAssignments = [];
+        
         foreach ($grades as $grade) {
             $totalEarned += $grade['marks'];
             $totalMax += $grade['max_marks'];
+            
+            // Check if student scored less than 65% on this assignment
+            $percentage = $grade['max_marks'] > 0 ? ($grade['marks'] / $grade['max_marks']) * 100 : 0.0;
+            if ($percentage < 65) {
+                $weakAssignments[] = $grade['assignment_title'];
+            }
         }
+        
         $overallScore = $totalMax > 0 ? ($totalEarned / $totalMax) * 100 : 0.0;
+        
+        $unsubmitted = $this->performanceRepository->getUnsubmittedAssignments($studentId, $courseId);
+        $unsubmittedTitles = array_column($unsubmitted, 'title');
 
-        // Determine risk level based on score AND attendance
+        // Determine risk level based on score, attendance, and missing submissions
         $riskLevel = 'low';
-        if ($overallScore < 50 || $attendancePercentage < 40) {
+        if ($overallScore < 50 || $attendancePercentage < 40 || count($unsubmittedTitles) > 2) {
             $riskLevel = 'high';
-        } elseif ($overallScore < 65 || $attendancePercentage < 60) {
+        } elseif ($overallScore < 65 || $attendancePercentage < 75 || count($unsubmittedTitles) > 0) {
             $riskLevel = 'medium';
         }
 
-        // Improvement Recommendations based on specific gaps
-        if ($riskLevel === 'high') {
-            $recommendations = $attendancePercentage < 40 
-                ? 'CRITICAL: Absenteeism is severely impacting learning. Immediate parent-teacher meeting required.'
-                : 'Immediate intervention required. Mandatory counseling and remedial classes.';
-            $weakTopics = 'Requires fundamental review across all recent topics.';
-        } elseif ($riskLevel === 'medium') {
-            $recommendations = $attendancePercentage < 60
-                ? 'Attendance needs to stabilize. Student is missing key conceptual lessons.'
-                : 'Needs to focus on practice assignments and consistent participation.';
-            $weakTopics = 'Inconsistent performance in recent chapters.';
+        // Build weak topics dynamically
+        $weakParts = [];
+        if (!empty($weakAssignments)) {
+            $weakParts[] = "Low grades in: " . implode(', ', $weakAssignments);
+        }
+        if (!empty($unsubmittedTitles)) {
+            $weakParts[] = "Missing submissions: " . implode(', ', $unsubmittedTitles);
+        }
+        
+        if (!empty($weakParts)) {
+            $weakTopics = implode(". ", $weakParts);
         } else {
-            $recommendations = 'Keep up the good work. Try advanced assignments.';
-            $weakTopics = 'No major weaknesses detected.';
+            if ($overallScore > 0 && $overallScore < 70) {
+                $weakTopics = "General conceptual gaps across course topics.";
+            } else {
+                $weakTopics = "No major weaknesses detected. Performing well.";
+            }
+        }
+
+        // Build improvement recommendations dynamically
+        $recommendationParts = [];
+        if ($attendancePercentage < 75) {
+            $recommendationParts[] = "Improve class attendance (currently " . round($attendancePercentage, 1) . "%). Attend all lectures and interactive discussions.";
+        }
+        if (!empty($unsubmittedTitles)) {
+            $recommendationParts[] = "Submit outstanding assignments (" . implode(', ', $unsubmittedTitles) . ") as soon as possible.";
+        }
+        if (!empty($weakAssignments)) {
+            $recommendationParts[] = "Review feedback and concepts for poorly performed assignments (" . implode(', ', $weakAssignments) . ").";
+        }
+        if ($overallScore < 60) {
+            $recommendationParts[] = "Schedule study hours and seek assistance from the teacher or tutor.";
+        }
+
+        if (empty($recommendationParts)) {
+            $recommendations = "Keep up the excellent work! Continue participating actively in class and assignments.";
+        } else {
+            $recommendations = implode(" ", $recommendationParts);
         }
 
         $data = [
@@ -87,7 +119,14 @@ class GapAnalysisService {
         return $data;
     }
 
-    public function getStudentAnalysis(int $studentId, ?int $courseId = null): array {
+    public function getStudentAnalysis(int $studentId, ?int $courseId = null, int $generatedBy = 1): array {
+        if ($courseId) {
+            try {
+                $this->generateAnalysis($studentId, (int)$courseId, $generatedBy);
+            } catch (Exception $e) {
+                error_log("Failed to auto-generate analysis on getStudentAnalysis: " . $e->getMessage());
+            }
+        }
         return $this->gapAnalysisRepository->getStudentAnalysis($studentId, $courseId);
     }
 

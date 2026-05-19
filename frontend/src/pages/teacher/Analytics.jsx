@@ -62,7 +62,10 @@ const AnalyticsPage = () => {
           performanceApi.getRiskReport()
         ]);
 
-        const nextCourses = toArray(unwrapApiData(coursesRes));
+        // Deduplicate courses by id — a teacher may be assigned to the same course
+        // across multiple classes, causing the API to return duplicate entries.
+        const rawCourses = toArray(unwrapApiData(coursesRes));
+        const nextCourses = [...new Map(rawCourses.map(c => [c.id, c])).values()];
         const nextRiskData = toArray(unwrapApiData(riskRes));
 
         setCourses(nextCourses);

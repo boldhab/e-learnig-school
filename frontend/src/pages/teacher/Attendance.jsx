@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
   X,
@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Users,
   ChevronDown,
+  BarChart2,
 } from 'lucide-react';
 import { TEACHER_COLORS } from '../../constants/teacherTheme';
 import attendanceApi from '../../api/modules/attendance.api';
@@ -35,6 +36,10 @@ const AttendancePage = () => {
   const [studentsLoading, setStudentsLoading]   = useState(false);
   const [submitting, setSubmitting]             = useState(false);
   const [searchTerm, setSearchTerm]             = useState('');
+  const [reportStudent, setReportStudent]       = useState(null);
+  const [reportData, setReportData]             = useState(null);
+  const [reportLoading, setReportLoading]       = useState(false);
+  const [reportModalOpen, setReportModalOpen]   = useState(false);
 
   // ── Load teacher's course+class options on mount ───────────────────────────
   useEffect(() => {
@@ -111,6 +116,22 @@ const AttendancePage = () => {
   }, [selectedOption, selectedDate]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleViewReport = async (student) => {
+    setReportStudent(student);
+    setReportModalOpen(true);
+    setReportLoading(true);
+    setReportData(null);
+    try {
+      const res = await attendanceApi.getStudentAttendance(student.id);
+      setReportData(res.data?.data ?? res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load attendance report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const handleStatusChange = (studentId, status) => {
     setAttendanceRecords(prev => ({
       ...prev,
@@ -332,6 +353,7 @@ const AttendancePage = () => {
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Student</th>
                   <th className="px-6 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Remarks</th>
+                  <th className="px-6 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Report</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: TEACHER_COLORS.BORDER }}>
@@ -397,6 +419,17 @@ const AttendancePage = () => {
                           className="w-full bg-transparent border-none outline-none text-sm text-slate-600 placeholder:text-slate-300"
                         />
                       </td>
+
+                      {/* Report action */}
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => handleViewReport(student)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                          title="View Attendance Report"
+                        >
+                          <BarChart2 size={18} />
+                        </button>
+                      </td>
                     </motion.tr>
                   );
                 })}
@@ -423,7 +456,231 @@ const AttendancePage = () => {
           )}
         </motion.button>
       </div>
+
+      {/* Student Attendance Report Modal */}
+      <StudentAttendanceReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        student={reportStudent}
+        reportData={reportData}
+        loading={reportLoading}
+      />
     </div>
+  );
+};
+
+// ─── Student Report Modal ───────────────────────────────────────────────────
+const StudentAttendanceReportModal = ({ isOpen, onClose, student, reportData, loading }) => {
+  if (!isOpen || !student) return null;
+
+  const summary = reportData?.summary ?? {
+    overall: { total: 0, present: 0, absent: 0, late: 0, percentage: 0 },
+    by_course: []
+  };
+  const records = reportData?.records ?? [];
+
+  const overall = summary.overall ?? { total: 0, present: 0, absent: 0, late: 0, percentage: 0 };
+  const byCourse = summary.by_course ?? [];
+
+  // Color logic for attendance rate percentage
+  const getRateColor = (rate) => {
+    const val = parseFloat(rate);
+    if (val >= 90) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    if (val >= 75) return 'text-amber-600 bg-amber-50 border-amber-200';
+    return 'text-red-600 bg-red-50 border-red-200';
+  };
+
+  const getRateProgressBarColor = (rate) => {
+    const val = parseFloat(rate);
+    if (val >= 90) return 'bg-emerald-500';
+    if (val >= 75) return 'bg-amber-500';
+    return 'bg-red-500';
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'present':
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1 w-max"><Check size={12} /> Present</span>;
+      case 'absent':
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-50 text-red-700 border border-red-100 flex items-center gap-1 w-max"><X size={12} /> Absent</span>;
+      case 'late':
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-1 w-max"><Clock size={12} /> Late</span>;
+      case 'excused':
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1 w-max"><AlertCircle size={12} /> Excused</span>;
+      default:
+        return <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-50 text-slate-700 border border-slate-100 w-max">{status}</span>;
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop overlay */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        />
+
+        {/* Modal content */}
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 15 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 15 }}
+          className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+        >
+          {/* Header */}
+          <div className="bg-slate-900 p-6 text-white flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-lg font-bold">
+                {student.full_name?.charAt(0)}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">{student.full_name}</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">Code: {student.student_code || 'N/A'}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center">
+                <Loader2 className="animate-spin text-blue-500 mb-3" size={36} />
+                <p className="text-slate-500 font-medium">Generating student report...</p>
+              </div>
+            ) : (
+              <>
+                {/* General stats cards */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">General Report</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {/* Rate card */}
+                    <div className={`p-4 rounded-2xl border text-center flex flex-col justify-center items-center ${getRateColor(overall.percentage)}`}>
+                      <span className="text-xs font-bold uppercase tracking-wider opacity-85">Rate</span>
+                      <span className="text-2xl font-black mt-1">{overall.percentage}%</span>
+                    </div>
+
+                    {/* Total days */}
+                    <div className="p-4 rounded-2xl border bg-slate-50 border-slate-200 text-center flex flex-col justify-center items-center text-slate-700">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Days</span>
+                      <span className="text-2xl font-black mt-1 text-slate-900">{overall.total}</span>
+                    </div>
+
+                    {/* Present count */}
+                    <div className="p-4 rounded-2xl border bg-emerald-50/40 border-emerald-100 text-center flex flex-col justify-center items-center text-emerald-800">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-500">Present</span>
+                      <span className="text-2xl font-black mt-1 text-emerald-700">{overall.present}</span>
+                    </div>
+
+                    {/* Absent count */}
+                    <div className="p-4 rounded-2xl border bg-red-50/40 border-red-100 text-center flex flex-col justify-center items-center text-red-800">
+                      <span className="text-xs font-bold uppercase tracking-wider text-red-500">Absent</span>
+                      <span className="text-2xl font-black mt-1 text-red-700">{overall.absent}</span>
+                    </div>
+
+                    {/* Late count */}
+                    <div className="p-4 rounded-2xl border bg-amber-50/40 border-amber-100 text-center flex flex-col justify-center items-center text-amber-800 col-span-2 md:col-span-1">
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-500">Late</span>
+                      <span className="text-2xl font-black mt-1 text-amber-700">{overall.late}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-Course breakdowns */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">Attendance by Course</h4>
+                  {byCourse.length === 0 ? (
+                    <p className="text-sm text-slate-400 bg-slate-50 p-4 rounded-xl text-center">No course records found.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {byCourse.map((course) => (
+                        <div key={course.course_id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-semibold text-sm text-slate-900 line-clamp-1">{course.course_name}</span>
+                            <span className="text-sm font-bold text-slate-700 shrink-0">{course.percentage}%</span>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${getRateProgressBarColor(course.percentage)}`}
+                              style={{ width: `${course.percentage}%` }}
+                            />
+                          </div>
+
+                          <div className="flex justify-between text-[11px] text-slate-400 font-medium mt-1">
+                            <span>Total: {course.total} days</span>
+                            <div className="flex gap-2">
+                              <span className="text-emerald-600 font-semibold">{course.present} P</span>
+                              <span className="text-red-500 font-semibold">{course.absent} A</span>
+                              <span className="text-amber-500 font-semibold">{course.late} L</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Attendance details history */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">Detailed Attendance Log</h4>
+                  {records.length === 0 ? (
+                    <p className="text-sm text-slate-400 bg-slate-50 p-4 rounded-xl text-center">No attendance history records logged.</p>
+                  ) : (
+                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="w-full text-left text-sm border-collapse">
+                          <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            <tr>
+                              <th className="px-4 py-2.5">Date</th>
+                              <th className="px-4 py-2.5">Course</th>
+                              <th className="px-4 py-2.5">Status</th>
+                              <th className="px-4 py-2.5">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {records.map((rec) => (
+                              <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-4 py-3 text-slate-600 font-medium whitespace-nowrap text-xs">
+                                  {new Date(rec.attendance_date).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </td>
+                                <td className="px-4 py-3 text-slate-800 font-medium text-xs max-w-[150px] truncate" title={rec.course_name}>
+                                  {rec.course_name}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {getStatusBadge(rec.status)}
+                                </td>
+                                <td className="px-4 py-3 text-slate-500 text-xs max-w-[150px] truncate" title={rec.remarks}>
+                                  {rec.remarks || <span className="text-slate-300 italic">—</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
   );
 };
 
