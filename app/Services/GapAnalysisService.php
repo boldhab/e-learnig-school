@@ -112,8 +112,25 @@ class GapAnalysisService {
             $this->notificationService->sendNotification(
                 $studentId,
                 "Academic Risk Warning",
-                "You have been identified as High Risk in course ID {$courseId}. Please speak with your teacher immediately."
+                "You have been identified as High Risk in course ID {$courseId}. Please speak with your teacher immediately.",
+                "performance",
+                "high"
             );
+            
+            // Notify parents
+            $db = \App\Core\Database::getInstance();
+            $parentStmt = $db->prepare("SELECT parent_id FROM parent_student WHERE student_id = ?");
+            $parentStmt->execute([$studentId]);
+            $parentIds = $parentStmt->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($parentIds as $pid) {
+                $this->notificationService->sendNotification(
+                    $pid,
+                    "Academic Risk Warning: Your Child",
+                    "Your child has been identified as High Risk in course ID {$courseId}. Please review their performance.",
+                    "performance",
+                    "high"
+                );
+            }
         }
 
         return $data;

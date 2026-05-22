@@ -18,7 +18,11 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
     password: '',
     role: 'student',
     class_id: '',
-    course_id: ''
+    course_id: '',
+    parent_name: '',
+    parent_email: '',
+    parent_password: '',
+    relationship_type: 'guardian'
   });
 
   useEffect(() => {
@@ -70,7 +74,7 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
       toast.success(`${formData.role.charAt(0).toUpperCase() + formData.role.slice(1)} created and assigned successfully!`);
       onUserCreated();
       onClose();
-      setFormData({ full_name: '', username: '', email: '', password: '', role: 'student', class_id: '', course_id: '' });
+      setFormData({ full_name: '', username: '', email: '', password: '', role: 'student', class_id: '', course_id: '', parent_name: '', parent_email: '', parent_password: '', relationship_type: 'guardian' });
     } catch (err) {
       console.error("Failed to create user:", err);
       toast.error(err.response?.data?.message || "Failed to create user");
@@ -207,13 +211,66 @@ const CreateUserModal = ({ isOpen, onClose, onUserCreated }) => {
                       </div>
                       <select
                         required
-                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-white"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-white mb-4"
                         value={formData.class_id}
                         onChange={(e) => setFormData({...formData, class_id: e.target.value})}
                       >
                         <option value="">Select a Class...</option>
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
+
+                      <div className="border-t border-slate-200 pt-4 mt-2">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3">Parent / Guardian Information</h3>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Parent Name</label>
+                              <input
+                                type="text"
+                                className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                placeholder="Parent Full Name"
+                                value={formData.parent_name}
+                                onChange={(e) => setFormData({...formData, parent_name: e.target.value})}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Relationship</label>
+                              <select
+                                className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-white"
+                                value={formData.relationship_type}
+                                onChange={(e) => setFormData({...formData, relationship_type: e.target.value})}
+                              >
+                                <option value="guardian">Guardian</option>
+                                <option value="mother">Mother</option>
+                                <option value="father">Father</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Parent Email</label>
+                            <input
+                              type="email"
+                              className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                              placeholder="parent@example.com"
+                              value={formData.parent_email}
+                              onChange={(e) => setFormData({...formData, parent_email: e.target.value})}
+                            />
+                            <p className="text-[10px] text-slate-400 ml-2">If this email exists, the student will be linked to the existing parent.</p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Parent Password (New Accounts)</label>
+                            <input
+                              type="password"
+                              className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                              placeholder="••••••••"
+                              value={formData.parent_password}
+                              onChange={(e) => setFormData({...formData, parent_password: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </motion.div>
                   ) : (
                     <motion.div

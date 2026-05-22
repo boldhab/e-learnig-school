@@ -40,6 +40,21 @@ class GradingService {
         // Notify student immediately on grading
         $this->notificationService->notifyGradePublished($submission['student_id'], $submissionId, $submission['title']);
         
+        // Notify parents
+        $db = \App\Core\Database::getInstance();
+        $parentStmt = $db->prepare("SELECT parent_id FROM parent_student WHERE student_id = ?");
+        $parentStmt->execute([$submission['student_id']]);
+        $parentIds = $parentStmt->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($parentIds as $pid) {
+            $this->notificationService->sendNotification(
+                $pid,
+                "Grade Published: " . $submission['title'],
+                "Your child received a grade for " . $submission['title'] . ": {$marks}/{$submission['max_marks']}",
+                "grading",
+                "medium"
+            );
+        }
+
         return true;
     }
 

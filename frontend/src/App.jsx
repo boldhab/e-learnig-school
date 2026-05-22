@@ -14,6 +14,7 @@ import PrivateRoute from './routes/PrivateRoute';
 import AdminRoutes from './routes/AdminRoutes';
 import StudentRoutes from './routes/StudentRoutes';
 import TeacherRoutes from './routes/TeacherRoutes';
+import ParentRoutes from './routes/ParentRoutes';
 
 // ─── Loading Fallback ────────────────────────────────────────────────────────
 const LoadingComponent = () => (
@@ -34,6 +35,7 @@ const RootRedirect = () => {
   const role = (user?.role || user?.type || '').toLowerCase();
   if (role === 'admin') return <Navigate to="/admin/dashboard" replace />;
   if (role === 'teacher' || role === 'instructor') return <Navigate to="/teacher/dashboard" replace />;
+  if (role === 'parent') return <Navigate to="/parent/dashboard" replace />;
   return <Navigate to="/student/dashboard" replace />;
 };
 
@@ -50,6 +52,7 @@ const LoginPage = () => {
     const role = (user?.role || user?.type || '').toLowerCase();
     if (role === 'admin') return <Navigate to="/admin/dashboard" replace />;
     if (role === 'teacher' || role === 'instructor') return <Navigate to="/teacher/dashboard" replace />;
+    if (role === 'parent') return <Navigate to="/parent/dashboard" replace />;
     return <Navigate to="/student/dashboard" replace />;
   }
 
@@ -64,6 +67,8 @@ const LoginPage = () => {
         navigate('/admin/dashboard');
       } else if (role === 'teacher' || role === 'instructor') {
         navigate('/teacher/dashboard');
+      } else if (role === 'parent') {
+        navigate('/parent/dashboard');
       } else {
         navigate('/student/dashboard');
       }
@@ -261,6 +266,18 @@ function App() {
                     <PrivateRoute allowedRoles={['admin']}>
                       <Suspense fallback={<LoadingComponent />}>
                         <AdminRoutes />
+                      </Suspense>
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Protected: Parent */}
+                <Route
+                  path="/parent/*"
+                  element={
+                    <PrivateRoute allowedRoles={['parent']}>
+                      <Suspense fallback={<LoadingComponent />}>
+                        <ParentRoutes />
                       </Suspense>
                     </PrivateRoute>
                   }

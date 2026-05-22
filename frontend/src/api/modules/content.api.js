@@ -6,7 +6,12 @@ const contentApi = {
   getCategories: (type) => api.get(`categories?type=${type}`),
 
   getMaterials: (subjectId, classId) =>
-    api.get(`materials?subject_id=${subjectId}&class_id=${classId}`),
+    api.get("materials", {
+      params: {
+        subject_id: subjectId,
+        ...(classId ? { class_id: classId } : {}),
+      },
+    }),
 
   /**
    * Get students enrolled in a course.

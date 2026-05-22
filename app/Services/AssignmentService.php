@@ -51,6 +51,20 @@ class AssignmentService {
                 $studentIds = $this->userRepository->getStudentsByClass($classId);
                 foreach ($studentIds as $studentId) {
                     $this->notificationService->notifyAssignmentCreated($studentId, $id, $data['title']);
+                    
+                    // Notify parents
+                    $parentStmt = $this->db->prepare("SELECT parent_id FROM parent_student WHERE student_id = ?");
+                    $parentStmt->execute([$studentId]);
+                    $parentIds = $parentStmt->fetchAll(PDO::FETCH_COLUMN);
+                    foreach ($parentIds as $pid) {
+                        $this->notificationService->sendNotification(
+                            $pid,
+                            "New Assignment: " . $data['title'],
+                            "A new assignment has been posted for your child.",
+                            "assignment",
+                            "medium"
+                        );
+                    }
                 }
             }
         }

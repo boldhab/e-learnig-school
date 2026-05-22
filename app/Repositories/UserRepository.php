@@ -57,22 +57,44 @@ class UserRepository {
                 (SELECT GROUP_CONCAT(sub.name SEPARATOR ', ') 
                  FROM teacher_assignments ta 
                  JOIN categories sub ON ta.course_id = sub.id 
-                 WHERE ta.teacher_id = u.id) as subjects
+                 WHERE ta.teacher_id = u.id) as subjects,
+                p.full_name as parent_name,
+                p.email as parent_email,
+                ps.relationship_type
                 FROM users u 
                 JOIN roles r ON u.role_id = r.id
-                LEFT JOIN categories cl ON u.class_id = cl.id";
+                LEFT JOIN categories cl ON u.class_id = cl.id
+                LEFT JOIN parent_student ps ON ps.student_id = u.id
+                LEFT JOIN users p ON ps.parent_id = p.id";
         return $this->db->query($sql)->fetchAll();
     }
 
     public function updateUser($id, $data) {
+        $allowedFields = [
+            'full_name',
+            'username',
+            'email',
+            'password',
+            'student_id',
+            'employee_id',
+            'phone_number',
+            'gender',
+            'status',
+            'class_id',
+        ];
+
         $fields = [];
         $params = ['id' => $id];
         
         foreach ($data as $key => $value) {
-            if ($key !== 'id') {
+            if ($key !== 'id' && in_array($key, $allowedFields, true)) {
                 $fields[] = "$key = :$key";
                 $params[$key] = $value;
             }
+        }
+
+        if (empty($fields)) {
+            return true;
         }
         
         $sql = "UPDATE users SET " . implode(', ', $fields) . " WHERE id = :id";

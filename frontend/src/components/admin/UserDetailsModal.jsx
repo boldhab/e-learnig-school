@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, Shield, Calendar, Trash2, Ban, Key, Save, AlertTriangle, CheckCircle, GraduationCap, BookOpen } from 'lucide-react';
 import adminApi from '../../api/modules/admin.api';
@@ -7,20 +7,56 @@ import toast from 'react-hot-toast';
 const UserDetailsModal = ({ user, isOpen, onClose, onActionComplete }) => {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({ ...user });
+  const [formData, setFormData] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !user) return;
+
+    setFormData({
+      full_name: user.full_name || '',
+      email: user.email || '',
+      username: user.username || '',
+      class_id: user.class_id ?? null,
+      parent_name: user.parent_name || '',
+      parent_email: user.parent_email || '',
+      relationship_type: user.relationship_type || 'guardian',
+      parent_password: '',
+    });
+    setIsEditing(false);
+    setShowDeleteConfirm(false);
+  }, [isOpen, user?.id]);
 
   if (!user) return null;
 
   const handleUpdate = async () => {
     setLoading(true);
     try {
-      await adminApi.updateUser({ id: user.id, ...formData });
+      const payload = {
+        id: user.id,
+        full_name: formData.full_name,
+        email: formData.email,
+        username: formData.username,
+      };
+
+      if (user.role_name === 'STUDENT') {
+        payload.class_id = formData.class_id;
+        payload.parent_name = formData.parent_name;
+        payload.parent_email = formData.parent_email;
+        payload.relationship_type = formData.relationship_type || 'guardian';
+
+        if (formData.parent_password) {
+          payload.parent_password = formData.parent_password;
+        }
+      }
+
+      await adminApi.updateUser(payload);
       toast.success("User updated successfully!");
       setIsEditing(false);
       onActionComplete();
     } catch (err) {
-      toast.error("Failed to update user");
+      const message = err?.response?.data?.message || "Failed to update user";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -169,6 +205,74 @@ const UserDetailsModal = ({ user, isOpen, onClose, onActionComplete }) => {
                       <div className="text-blue-900 font-bold flex items-center gap-2 bg-blue-50 p-2 rounded-lg">
                         <GraduationCap size={16} />
                         {user.class_name}
+                      </div>
+                    </div>
+                  )}
+
+                  {user.role_name === 'STUDENT' && (
+                    <div className="pt-4 border-t border-slate-200">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3">Parent Information</h3>
+                      
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Parent Name</label>
+                          {isEditing ? (
+                            <input 
+                              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                              placeholder="Parent Full Name"
+                              value={formData.parent_name || ''}
+                              onChange={e => setFormData({...formData, parent_name: e.target.value})}
+                            />
+                          ) : (
+                            <div className="text-slate-900 font-medium text-sm">
+                              {user.parent_name || <span className="text-slate-400 italic">Not Linked</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Parent Email</label>
+                          {isEditing ? (
+                            <input 
+                              className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                              placeholder="parent@example.com"
+                              type="email"
+                              value={formData.parent_email || ''}
+                              onChange={e => setFormData({...formData, parent_email: e.target.value})}
+                            />
+                          ) : (
+                            <div className="text-slate-900 font-medium text-sm">
+                              {user.parent_email || <span className="text-slate-400 italic">No Email</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        {isEditing && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Relationship</label>
+                            <select
+                                className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
+                                value={formData.relationship_type || 'guardian'}
+                                onChange={e => setFormData({...formData, relationship_type: e.target.value})}
+                              >
+                                <option value="guardian">Guardian</option>
+                                <option value="mother">Mother</option>
+                                <option value="father">Father</option>
+                            </select>
+                          </div>
+                        )}
+                        {isEditing && (
+                           <div className="space-y-1">
+                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">New Parent Password (Optional)</label>
+                             <input 
+                               className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                               placeholder="Leave blank to keep current"
+                               type="password"
+                               value={formData.parent_password || ''}
+                               onChange={e => setFormData({...formData, parent_password: e.target.value})}
+                             />
+                           </div>
+                        )}
                       </div>
                     </div>
                   )}

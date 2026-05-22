@@ -45,6 +45,27 @@ export const EmptyState = ({ icon: Icon, title, description, action }) => (
   </motion.div>
 );
 
+// Page Header Component
+export const PageHeader = ({ title, subtitle, action }) => (
+  <motion.div
+    className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+    initial={{ opacity: 0, y: -8 }}
+    animate={{ opacity: 1, y: 0 }}
+  >
+    <div>
+      <h1 className="text-3xl font-bold" style={{ color: COLORS.TEXT_PRIMARY }}>
+        {title}
+      </h1>
+      {subtitle && (
+        <p className="mt-2 text-sm" style={{ color: COLORS.TEXT_SECONDARY }}>
+          {subtitle}
+        </p>
+      )}
+    </div>
+    {action && <div>{action}</div>}
+  </motion.div>
+);
+
 // Badge Component
 export const Badge = ({ children, variant = 'default', color = COLORS.PRIMARY_BLUE }) => {
   const variants = {

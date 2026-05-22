@@ -198,3 +198,16 @@ $router->get('/api/support/tickets', [SupportTicketController::class, 'list']);
 $router->get('/api/support/tickets/{id}', [SupportTicketController::class, 'get']);
 $router->post('/api/support/tickets/{id}/reply', [SupportTicketController::class, 'reply']);
 $router->put('/api/support/tickets/{id}/status', [SupportTicketController::class, 'updateStatus']);
+
+// ==========================================
+// PARENT MODULE ROUTES
+// ==========================================
+$router->get('/api/parent/children', [\App\Controllers\ParentController::class, 'getChildren']);
+$router->get('/api/parent/students/{id}/overview', [\App\Controllers\ParentController::class, 'getChildOverview']);
+$router->get('/api/parent/students/{id}/courses', [\App\Controllers\ParentController::class, 'getChildCourses']);
+$router->get('/api/parent/students/{id}/assignments', [\App\Controllers\ParentController::class, 'getChildAssignments']);
+$router->get('/api/parent/students/{id}/attendance', [\App\Controllers\ParentController::class, 'getChildAttendance']);
+$router->get('/api/parent/students/{id}/performance', [\App\Controllers\ParentController::class, 'getChildPerformance']);
+$router->get('/api/parent/students/{id}/risk-report', [\App\Controllers\ParentController::class, 'getChildRiskReport']);
+$router->get('/api/parent/students/{id}/reports', [\App\Controllers\ParentController::class, 'getChildReports']);
+$router->get('/api/parent/notifications', [\App\Controllers\NotificationController::class, 'getNotifications']); // Existing handles via role_id

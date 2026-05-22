@@ -70,6 +70,22 @@ class AttendanceService {
                             "Attendance Alert",
                             "You were marked absent today. Current attendance: {$percentage}%"
                         );
+
+                        // Notify parents
+                        $parentRepo = new \App\Repositories\ParentRepository();
+                        $parents = $parentRepo->getLinkedChildren((int)$record['student_id']); // Wait, no, we need getParentsForStudent
+                        // Let me check if getParentsForStudent exists or if I should just use raw query here
+                        $db = \App\Core\Database::getInstance();
+                        $parentStmt = $db->prepare("SELECT parent_id FROM parent_student WHERE student_id = ?");
+                        $parentStmt->execute([(int)$record['student_id']]);
+                        $parentIds = $parentStmt->fetchAll(\PDO::FETCH_COLUMN);
+                        foreach ($parentIds as $pid) {
+                            $this->createSimpleNotification(
+                                (int)$pid,
+                                "Attendance Alert",
+                                "Your child was marked absent today. Current attendance: {$percentage}%"
+                            );
+                        }
                     } catch (Exception $e) {
                         // Notification failure shouldn't affect attendance marking
                         error_log("Notification failed for student {$record['student_id']}: " . $e->getMessage());

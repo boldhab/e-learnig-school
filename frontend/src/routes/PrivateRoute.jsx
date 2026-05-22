@@ -16,6 +16,7 @@ const ROLE_DASHBOARDS = {
   admin: '/admin/dashboard',
   teacher: '/teacher/dashboard',
   instructor: '/teacher/dashboard',
+  parent: '/parent/dashboard',
   student: '/student/dashboard',
 };
 

@@ -11,6 +11,7 @@ use App\Helpers\HtmlSanitizer;
 use App\Core\Validation;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\RoleMiddleware;
+use App\Repositories\UserRepository;
 
 class ContentController {
     use ApiResponseTrait, LoggerTrait;
@@ -66,11 +67,20 @@ class ContentController {
 
     public function listForStudent(Request $request, Response $response) {
         $user = $GLOBALS['auth_user'];
-        
-        // In a real system, we'd get the student's class_id from their profile
-        // For now, we expect it in the query or from profile if implemented
-        $classId = $request->getBody()['class_id'] ?? null;
-        $subjectId = $request->getBody()['subject_id'] ?? null;
+
+        $query = $request->getBody();
+        $classId = $query['class_id'] ?? null;
+        $subjectId = $query['subject_id'] ?? $query['course_id'] ?? null;
+
+        // Student pages only know the selected course. Resolve class_id from the
+        // authenticated user profile so GET /api/materials works without extra state.
+        if (!$classId && (($user['role'] ?? null) === 'STUDENT')) {
+            $userId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+            if ($userId > 0) {
+                $dbUser = (new UserRepository())->findById($userId);
+                $classId = $dbUser['class_id'] ?? null;
+            }
+        }
 
         if (!$classId) {
             return $this->error('Class ID is required', 400);
