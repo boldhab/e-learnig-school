@@ -32,7 +32,7 @@ const ParentNotifications = () => {
     }
   };
 
-  if (loading) return <div className="text-white p-6">Loading notifications...</div>;
+  if (loading) return <ParentPanel className="p-6 text-sm text-slate-500">Loading notifications...</ParentPanel>;
 
   const unreadCount = notifications.filter((notification) => !notification.is_read).length;
   const academicCount = notifications.filter((notification) => ['grade', 'assignment'].includes(notification.type)).length;
@@ -70,7 +70,7 @@ const ParentNotifications = () => {
         {notifications.map((notif) => (
           <div
             key={notif.id}
-            className={`rounded-[1.6rem] border p-5 transition-colors ${
+            className={`rounded-lg border p-5 transition-colors ${
               !notif.is_read ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-slate-50/60'
             }`}
           >
@@ -87,7 +87,7 @@ const ParentNotifications = () => {
                     </ParentBadge>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-500">{notif.message}</p>
-                  <span className="mt-3 block text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                  <span className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-400">
                     {new Date(notif.created_at).toLocaleString()}
                   </span>
                 </div>
@@ -95,7 +95,7 @@ const ParentNotifications = () => {
               {!notif.is_read && (
                 <button
                   onClick={() => markAsRead(notif.id)}
-                  className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+                  className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
                 >
                   <CheckCircle size={14} /> Mark Read
                 </button>

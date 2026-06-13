@@ -11,11 +11,30 @@ class Request {
         if ($position !== false) {
             $path = substr($path, 0, $position);
         }
+        $path = rawurldecode($path);
 
-        // Handle XAMPP subdirectory and front controller
-        $prefixes = ['/millinium/public/main.php', '/millinium/public', '/millinium'];
+        // Handle XAMPP subdirectories and front controllers dynamically.
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        $projectBase = '';
+        if ($scriptName !== '') {
+            $scriptDir = str_replace('\\', '/', dirname($scriptName));
+            $projectBase = preg_replace('#/public$#', '', $scriptDir);
+        }
+
+        $prefixes = array_filter(array_unique([
+            $scriptName,
+            $projectBase . '/public/main.php',
+            $projectBase . '/public/index.php',
+            $projectBase . '/public',
+            $projectBase,
+            '/millinium/public/main.php',
+            '/millinium/public/index.php',
+            '/millinium/public',
+            '/millinium',
+        ]));
+
         foreach ($prefixes as $prefix) {
-            if (strpos($path, $prefix) === 0) {
+            if ($prefix !== '/' && strpos($path, $prefix) === 0) {
                 $path = substr($path, strlen($prefix));
                 break;
             }

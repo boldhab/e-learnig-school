@@ -6,6 +6,7 @@ const ParentDashboard = lazy(() => import('../pages/parent/ParentDashboard'));
 const ChildCourses = lazy(() => import('../pages/parent/ChildCourses'));
 const ChildAssignments = lazy(() => import('../pages/parent/ChildAssignments'));
 const ChildAttendance = lazy(() => import('../pages/parent/ChildAttendance'));
+const ChildPerformance = lazy(() => import('../pages/parent/ChildPerformance'));
 const ChildReports = lazy(() => import('../pages/parent/ChildReports'));
 const ParentNotifications = lazy(() => import('../pages/parent/ParentNotifications'));
 
@@ -19,7 +20,7 @@ const ParentRoutes = () => {
         <Route path="student/:id/assignments" element={<ChildAssignments />} />
         <Route path="student/:id/attendance" element={<ChildAttendance />} />
         <Route path="student/:id/reports" element={<ChildReports />} />
-        <Route path="student/:id/performance" element={<Navigate to="../reports" replace />} />
+        <Route path="student/:id/performance" element={<ChildPerformance />} />
         <Route path="notifications" element={<ParentNotifications />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>

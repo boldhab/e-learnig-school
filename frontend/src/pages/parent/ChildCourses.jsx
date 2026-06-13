@@ -49,21 +49,21 @@ const ChildCourses = () => {
 
       <ParentPanel className="p-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Student</p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900">
               <UserRound size={16} className="text-slate-400" />
               {child?.full_name || '-'}
             </p>
           </div>
-          <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Grade</p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900">
               <GraduationCap size={16} className="text-slate-400" />
               {child?.class_name || '-'}
             </p>
           </div>
-          <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Department</p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-900">
               <BookOpen size={16} className="text-slate-400" />
@@ -87,25 +87,25 @@ const ChildCourses = () => {
                     <h2 className="text-xl font-semibold text-slate-900">{course.course_name}</h2>
                     <p className="mt-1 text-sm text-slate-500">Teacher: {course.teacher_name}</p>
                   </div>
-                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                  <span className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
                     {progress}% progress
                   </span>
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assignments</p>
                     <p className="mt-2 text-2xl font-semibold text-slate-900">{assignmentsTotal}</p>
                   </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Submitted</p>
                     <p className="mt-2 text-2xl font-semibold text-slate-900">{submissionsTotal}</p>
                   </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Average Grade</p>
                     <p className="mt-2 text-2xl font-semibold text-emerald-700">{course.average_grade ?? 0}%</p>
                   </div>
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Attendance</p>
                     <p className="mt-2 text-2xl font-semibold text-amber-700">{course.attendance_percentage ?? 0}%</p>
                   </div>

@@ -38,12 +38,12 @@ const ParentHeader = ({ onMenuClick }) => {
           <button
             type="button"
             onClick={onMenuClick}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 lg:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 lg:hidden"
           >
             <Menu size={20} />
           </button>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Parent Care Hub</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Parent Care Hub</p>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <span className="font-semibold text-slate-900">{todayLabel}</span>
               <span className="hidden sm:inline text-slate-300">|</span>
@@ -62,27 +62,27 @@ const ParentHeader = ({ onMenuClick }) => {
             <button
               type="button"
               onClick={() => setShowProfileMenu((value) => !value)}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:bg-slate-50"
+              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:bg-slate-50"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-400 text-sm font-bold text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-400 text-sm font-bold text-white">
                 {initials}
               </div>
               <div className="hidden text-left sm:block">
                 <p className="text-sm font-semibold text-slate-900">{user?.full_name || 'Parent User'}</p>
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Parent Account</p>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Parent Account</p>
               </div>
               <ChevronDown size={16} className="text-slate-400" />
             </button>
 
             {showProfileMenu ? (
-              <div className="absolute right-0 mt-3 w-56 rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.4)]">
+              <div className="absolute right-0 mt-3 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.4)]">
                 <button
                   type="button"
                   onClick={() => {
                     setShowProfileMenu(false);
                     navigate('/parent/dashboard');
                   }}
-                  className="w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="w-full rounded-lg px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Dashboard
                 </button>
@@ -92,7 +92,7 @@ const ParentHeader = ({ onMenuClick }) => {
                     setShowProfileMenu(false);
                     navigate('/parent/notifications');
                   }}
-                  className="w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="w-full rounded-lg px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Notifications
                 </button>
@@ -107,7 +107,7 @@ const ParentHeader = ({ onMenuClick }) => {
                     }
                     navigate('/auth/login');
                   }}
-                  className="mt-1 w-full rounded-2xl bg-slate-900 px-4 py-3 text-left text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="mt-1 w-full rounded-lg bg-slate-900 px-4 py-3 text-left text-sm font-semibold text-white transition hover:bg-slate-800"
                 >
                   Logout
                 </button>

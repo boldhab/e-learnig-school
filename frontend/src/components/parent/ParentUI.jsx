@@ -12,15 +12,11 @@ export const ParentPageHero = ({ eyebrow, title, subtitle, action, tone = 'slate
   <motion.section
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
-    className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br px-6 py-7 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.45)] md:px-8 ${toneClasses[tone] || toneClasses.slate}`}
+    className={`relative overflow-hidden rounded-lg bg-gradient-to-br px-6 py-7 shadow-sm md:px-8 ${toneClasses[tone] || toneClasses.slate}`}
   >
-    <div className="absolute inset-0 opacity-20">
-      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white blur-3xl" />
-      <div className="absolute bottom-0 left-0 h-32 w-32 rounded-full bg-cyan-300 blur-3xl" />
-    </div>
     <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-3xl">
-        {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-[0.28em] opacity-75">{eyebrow}</p>}
+        {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-wide opacity-75">{eyebrow}</p>}
         <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
         {subtitle && <p className="mt-3 max-w-2xl text-sm leading-6 opacity-80 md:text-base">{subtitle}</p>}
         {children && <div className="mt-5">{children}</div>}
@@ -40,7 +36,7 @@ export const ParentPanel = ({ children, className = '', tone = 'white' }) => {
 
   return (
     <div
-      className={`rounded-[1.75rem] border border-slate-200/70 ${bgClass} shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)] ${className}`}
+      className={`rounded-lg border border-slate-200/70 ${bgClass} shadow-sm ${className}`}
     >
       {children}
     </div>
@@ -62,10 +58,10 @@ export const ParentStatCard = ({ icon: Icon, label, value, caption, tone = 'blue
         <div>
           <p className="text-sm font-medium text-slate-500">{label}</p>
           <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
-          {caption && <p className="mt-2 text-xs font-medium uppercase tracking-[0.22em] text-slate-400">{caption}</p>}
+          {caption && <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400">{caption}</p>}
         </div>
         {Icon && (
-          <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 ${accents[tone] || accents.blue}`}>
+          <div className={`flex h-12 w-12 items-center justify-center rounded-lg ring-1 ${accents[tone] || accents.blue}`}>
             <Icon size={20} />
           </div>
         )}
@@ -97,7 +93,7 @@ export const ParentBadge = ({ children, tone = 'slate' }) => {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${tones[tone] || tones.slate}`}>
+    <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide ${tones[tone] || tones.slate}`}>
       {children}
     </span>
   );

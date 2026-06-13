@@ -108,7 +108,7 @@ class ParentRepository {
                     SELECT COUNT(*)
                     FROM submissions s
                     INNER JOIN assignments a ON a.id = s.assignment_id
-                    WHERE s.student_id = :student_id
+                    WHERE s.student_id = :student_id_submissions
                       AND a.course_id = c.id
                 ) AS submissions_total,
                 (
@@ -116,7 +116,7 @@ class ParentRepository {
                     FROM submissions s
                     INNER JOIN assignments a ON a.id = s.assignment_id
                     INNER JOIN grades g ON g.submission_id = s.id
-                    WHERE s.student_id = :student_id
+                    WHERE s.student_id = :student_id_graded
                       AND a.course_id = c.id
                 ) AS graded_total,
                 (
@@ -124,7 +124,7 @@ class ParentRepository {
                     FROM submissions s
                     INNER JOIN assignments a ON a.id = s.assignment_id
                     INNER JOIN grades g ON g.submission_id = s.id
-                    WHERE s.student_id = :student_id
+                    WHERE s.student_id = :student_id_average
                       AND a.course_id = c.id
                 ) AS average_grade,
                 (
@@ -133,7 +133,7 @@ class ParentRepository {
                         1
                     )
                     FROM attendance_records ar
-                    WHERE ar.student_id = :student_id
+                    WHERE ar.student_id = :student_id_attendance
                       AND ar.course_id = c.id
                 ) AS attendance_percentage
             FROM users u
@@ -145,7 +145,13 @@ class ParentRepository {
             GROUP BY c.id, c.name, cl.name
             ORDER BY c.name ASC
         ");
-        $stmt->execute(['student_id' => $studentId]);
+        $stmt->execute([
+            'student_id' => $studentId,
+            'student_id_submissions' => $studentId,
+            'student_id_graded' => $studentId,
+            'student_id_average' => $studentId,
+            'student_id_attendance' => $studentId,
+        ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -191,6 +197,99 @@ class ParentRepository {
             ORDER BY a.due_date DESC, a.created_at DESC
         ");
         $stmt->execute(['student_id' => $studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getStudentGradeReportRows(int $studentId): array {
+        $stmt = $this->db->prepare("
+            SELECT
+                a.id AS assignment_id,
+                a.title AS assignment_title,
+                a.due_date,
+                a.max_marks,
+                c.id AS course_id,
+                c.name AS course_name,
+                MAX(COALESCE(t.full_name, author.full_name, 'Teacher')) AS teacher_name,
+                s.id AS submission_id,
+                s.status AS submission_status,
+                s.submitted_at,
+                g.marks,
+                g.feedback,
+                g.published_at,
+                CASE
+                    WHEN g.id IS NOT NULL OR s.status = 'graded' THEN 'graded'
+                    WHEN s.id IS NOT NULL AND (
+                        s.status = 'late' OR
+                        (s.submitted_at IS NOT NULL AND a.due_date IS NOT NULL AND s.submitted_at > a.due_date)
+                    ) THEN 'late'
+                    WHEN s.id IS NOT NULL THEN 'submitted'
+                    WHEN a.due_date IS NOT NULL AND a.due_date < NOW() THEN 'missing'
+                    ELSE 'pending'
+                END AS report_status,
+                CASE
+                    WHEN g.marks IS NOT NULL AND a.max_marks > 0
+                    THEN ROUND((g.marks / a.max_marks) * 100, 1)
+                    ELSE NULL
+                END AS percentage
+            FROM users u
+            INNER JOIN teacher_assignments ta ON ta.class_id = u.class_id
+            INNER JOIN assignments a ON a.course_id = ta.course_id
+            INNER JOIN categories c ON c.id = a.course_id
+            LEFT JOIN users t ON t.id = ta.teacher_id
+            LEFT JOIN users author ON author.id = a.created_by
+            LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = u.id
+            LEFT JOIN grades g ON g.submission_id = s.id
+            WHERE u.id = :student_id
+            GROUP BY
+                a.id, a.title, a.due_date, a.max_marks, c.id, c.name,
+                s.id, s.status, s.submitted_at, g.id, g.marks, g.feedback, g.published_at
+            ORDER BY COALESCE(g.published_at, s.submitted_at, a.due_date, a.created_at) DESC
+        ");
+        $stmt->execute(['student_id' => $studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getStudentPerformanceReports(int $studentId): array {
+        $stmt = $this->db->prepare("
+            SELECT
+                pr.id,
+                pr.course_id,
+                c.name AS course_name,
+                pr.assignment_average,
+                pr.quiz_average,
+                pr.exam_average,
+                pr.attendance_percentage,
+                pr.overall_score,
+                pr.performance_level,
+                pr.generated_at
+            FROM performance_reports pr
+            INNER JOIN categories c ON c.id = pr.course_id
+            WHERE pr.student_id = :student_id
+            ORDER BY pr.generated_at DESC
+        ");
+        $stmt->execute(['student_id' => $studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getStudentRecentAttendanceRows(int $studentId, int $limit = 20): array {
+        $stmt = $this->db->prepare("
+            SELECT
+                ar.id,
+                ar.attendance_date,
+                ar.status,
+                ar.remarks,
+                c.name AS course_name,
+                t.full_name AS teacher_name
+            FROM attendance_records ar
+            INNER JOIN categories c ON c.id = ar.course_id
+            LEFT JOIN users t ON t.id = ar.teacher_id
+            WHERE ar.student_id = :student_id
+            ORDER BY ar.attendance_date DESC, ar.id DESC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':student_id', $studentId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

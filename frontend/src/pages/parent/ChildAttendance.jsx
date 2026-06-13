@@ -38,7 +38,7 @@ const ChildAttendance = () => {
     fetchData();
   }, [id]);
 
-  if (loading) return <div className="p-6 text-slate-500">Loading attendance...</div>;
+  if (loading) return <ParentPanel className="p-6 text-sm text-slate-500">Loading attendance...</ParentPanel>;
 
   const child = attendanceData?.child;
   const summary = attendanceData?.summary ?? {};
@@ -75,11 +75,11 @@ const ChildAttendance = () => {
         tone="amber"
         action={
           <div className="flex flex-wrap gap-2">
-            <button onClick={handleExport} className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+            <button onClick={handleExport} className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
               <Download size={16} />
               Weekly / Monthly CSV
             </button>
-            <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+            <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
               <Printer size={16} />
               Save as PDF
             </button>
@@ -106,12 +106,12 @@ const ChildAttendance = () => {
           <div className="mt-5 space-y-3">
             {alerts.length > 0 ? (
               alerts.map((alert, index) => (
-                <div key={`${alert}-${index}`} className="rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                <div key={`${alert}-${index}`} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                   {alert}
                 </div>
               ))
             ) : (
-              <div className="rounded-[1.4rem] bg-emerald-50 px-4 py-6 text-sm font-medium text-emerald-700">
+              <div className="rounded-lg bg-emerald-50 px-4 py-6 text-sm font-medium text-emerald-700">
                 No attendance alerts right now.
               </div>
             )}
@@ -121,21 +121,27 @@ const ChildAttendance = () => {
         <ParentPanel className="p-6">
           <ParentSectionHeading title="Attendance by Course" subtitle="Course-level present, absent, and late records for the linked child." />
           <div className="mt-5 space-y-3">
-            {byCourse.map((course) => (
-              <div key={course.course_id} className="rounded-[1.4rem] border border-slate-200 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-900">{course.course_name}</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Present: {course.present} • Absent: {course.absent} • Late: {course.late}
-                    </p>
+            {byCourse.length > 0 ? (
+              byCourse.map((course) => (
+                <div key={course.course_id} className="rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{course.course_name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Present: {course.present} - Absent: {course.absent} - Late: {course.late}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-white">
+                      {course.percentage ?? 0}%
+                    </span>
                   </div>
-                  <span className="rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white">
-                    {course.percentage ?? 0}%
-                  </span>
                 </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                No course-level attendance records yet.
               </div>
-            ))}
+            )}
           </div>
         </ParentPanel>
       </div>
@@ -144,7 +150,7 @@ const ChildAttendance = () => {
         <ParentSectionHeading title="Monthly Attendance Report" subtitle="Use this section to produce weekly and monthly summaries for family follow-up." />
         <div className="mt-5 overflow-x-auto">
           <table className="min-w-full text-left">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="pb-3 font-semibold">Month</th>
                 <th className="pb-3 font-semibold">Attendance %</th>
@@ -163,6 +169,13 @@ const ChildAttendance = () => {
                   <td className="py-3 text-sm text-slate-600">{item.late_count ?? 0}</td>
                 </tr>
               ))}
+              {monthly.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="py-6 text-center text-sm text-slate-500">
+                    No monthly attendance records yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -172,7 +185,7 @@ const ChildAttendance = () => {
         <ParentSectionHeading title="Absence & Daily History" subtitle="Daily log of attendance, remarks, and absence history." />
         <div className="mt-5 overflow-x-auto">
           <table className="min-w-full text-left">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="pb-3 font-semibold">Date</th>
                 <th className="pb-3 font-semibold">Course</th>
@@ -186,7 +199,7 @@ const ChildAttendance = () => {
                   <td className="py-3 text-sm text-slate-600">{new Date(record.attendance_date).toLocaleDateString()}</td>
                   <td className="py-3 font-medium text-slate-900">{record.course_name}</td>
                   <td className="py-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
+                    <span className={`rounded-md px-3 py-1 text-xs font-semibold uppercase ${
                       record.status === 'present'
                         ? 'bg-emerald-100 text-emerald-700'
                         : record.status === 'absent'
@@ -199,6 +212,13 @@ const ChildAttendance = () => {
                   <td className="py-3 text-sm text-slate-600">{record.remarks || '-'}</td>
                 </tr>
               ))}
+              {records.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="py-6 text-center text-sm text-slate-500">
+                    No daily attendance history yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

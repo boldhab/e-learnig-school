@@ -59,7 +59,7 @@ const Header = () => {
             className="flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-gray-100"
           >
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-white font-semibold text-sm"
               style={{ backgroundColor: COLORS.PRIMARY_BLUE }}
             >
               {getInitials(user?.full_name)}

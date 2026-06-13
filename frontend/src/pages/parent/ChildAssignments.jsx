@@ -87,7 +87,7 @@ const ChildAssignments = () => {
               key={status}
               type="button"
               onClick={() => setStatusFilter(status)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
                 statusFilter === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -98,7 +98,7 @@ const ChildAssignments = () => {
 
         <div className="mt-6 overflow-x-auto">
           <table className="min-w-full text-left">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="pb-3 font-semibold">Assignment</th>
                 <th className="pb-3 font-semibold">Course</th>
@@ -120,7 +120,7 @@ const ChildAssignments = () => {
                     {assignment.due_date ? new Date(assignment.due_date).toLocaleString() : 'TBD'}
                   </td>
                   <td className="py-4">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${statusTone[assignment.parent_status] || statusTone.pending}`}>
+                    <span className={`rounded-md px-3 py-1 text-xs font-semibold uppercase ${statusTone[assignment.parent_status] || statusTone.pending}`}>
                       {assignment.parent_status}
                     </span>
                   </td>

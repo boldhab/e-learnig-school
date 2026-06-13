@@ -1,22 +1,68 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   House,
   Bell,
   LogOut,
   ShieldCheck,
+  BookOpen,
+  ClipboardList,
+  ShieldAlert,
+  TrendingUp,
+  LineChart,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { parentApi } from '../../api/modules/parent.api';
 
 const ParentSidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+  const [children, setChildren] = useState([]);
+
+  const currentStudentId = useMemo(() => {
+    const match = location.pathname.match(/\/parent\/student\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [location.pathname]);
+
+  const selectedStudentId = currentStudentId || children[0]?.id;
 
   const menuItems = [
     { icon: House, label: 'Overview', caption: 'Home command center', path: '/parent/dashboard' },
     { icon: Bell, label: 'Alerts', caption: 'Notifications and warnings', path: '/parent/notifications' },
   ];
+
+  const childMenuItems = selectedStudentId
+    ? [
+        { icon: BookOpen, label: 'Courses', caption: 'Child course list', path: `/parent/student/${selectedStudentId}/courses` },
+        { icon: ClipboardList, label: 'Assignments', caption: 'Tasks and submissions', path: `/parent/student/${selectedStudentId}/assignments` },
+        { icon: ShieldAlert, label: 'Attendance', caption: 'Presence and absence', path: `/parent/student/${selectedStudentId}/attendance` },
+        { icon: TrendingUp, label: 'Performance', caption: 'Grades and progress', path: `/parent/student/${selectedStudentId}/performance` },
+        { icon: LineChart, label: 'Reports', caption: 'Full child report', path: `/parent/student/${selectedStudentId}/reports` },
+      ]
+    : [];
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchChildren = async () => {
+      try {
+        const response = await parentApi.getChildren();
+        if (mounted) {
+          setChildren(response.data?.data ?? []);
+        }
+      } catch (error) {
+        console.error('Failed to load parent sidebar children', error);
+      }
+    };
+
+    fetchChildren();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
@@ -33,11 +79,11 @@ const ParentSidebar = ({ isOpen, setIsOpen }) => {
     <>
       <div className="border-b border-white/10 px-6 pb-6 pt-8">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-950/30">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-950/30">
             <ShieldCheck size={22} />
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-200/70">Millennium LMS</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200/70">Millennium LMS</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Parent Portal</h2>
             <p className="mt-2 max-w-[13rem] text-sm leading-6 text-slate-400">
               Child safety, attendance, assignments, and reports in one place.
@@ -47,7 +93,7 @@ const ParentSidebar = ({ isOpen, setIsOpen }) => {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 py-5">
-        <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Workspace</p>
+        <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Workspace</p>
         <div className="mt-3 space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -61,14 +107,14 @@ const ParentSidebar = ({ isOpen, setIsOpen }) => {
                 setIsOpen(false);
               }}
               whileHover={{ x: 3 }}
-              className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${
+              className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
                 active
                   ? 'border-cyan-400/40 bg-white/10 text-white shadow-[0_16px_28px_-22px_rgba(34,211,238,0.65)]'
                   : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${active ? 'bg-cyan-400/20 text-cyan-200' : 'bg-white/5 text-slate-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${active ? 'bg-cyan-400/20 text-cyan-200' : 'bg-white/5 text-slate-400'}`}>
                   <Icon size={18} />
                 </div>
                 <div className="min-w-0">
@@ -80,16 +126,54 @@ const ParentSidebar = ({ isOpen, setIsOpen }) => {
           );
         })}
         </div>
+
+        <p className="mt-6 px-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Child Reports</p>
+        <div className="mt-3 space-y-2">
+        {childMenuItems.length > 0 ? childMenuItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.path);
+
+          return (
+            <motion.button
+              key={item.path}
+              onClick={() => {
+                navigate(item.path);
+                setIsOpen(false);
+              }}
+              whileHover={{ x: 3 }}
+              className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
+                active
+                  ? 'border-cyan-400/40 bg-white/10 text-white shadow-[0_16px_28px_-22px_rgba(34,211,238,0.65)]'
+                  : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${active ? 'bg-cyan-400/20 text-cyan-200' : 'bg-white/5 text-slate-400'}`}>
+                  <Icon size={18} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{item.label}</p>
+                  <p className={`mt-1 text-xs ${active ? 'text-slate-200/80' : 'text-slate-500'}`}>{item.caption}</p>
+                </div>
+              </div>
+            </motion.button>
+          );
+        }) : (
+          <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-400">
+            No linked child found.
+          </div>
+        )}
+        </div>
       </nav>
 
       <div className="border-t border-white/10 p-4">
         <motion.button
           onClick={handleLogout}
           whileHover={{ x: 3 }}
-          className="w-full rounded-2xl bg-white/5 px-4 py-3 text-left text-slate-300 transition hover:bg-white/10 hover:text-white"
+          className="w-full rounded-lg bg-white/5 px-4 py-3 text-left text-slate-300 transition hover:bg-white/10 hover:text-white"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5">
               <LogOut size={18} />
             </div>
             <div>

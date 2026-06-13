@@ -1,18 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bell, BookOpen, ClipboardList, GraduationCap, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, Bell, BookOpen, ClipboardList, LineChart, ShieldAlert, TrendingUp, Users } from 'lucide-react';
 import { parentApi } from '../../api/modules/parent.api';
 import { ParentBadge, ParentEmptyState, ParentPageHero, ParentPanel, ParentSectionHeading, ParentStatCard } from '../../components/parent/ParentUI';
+
+const childActions = [
+  { label: 'Courses', icon: BookOpen, suffix: 'courses', tone: 'primary' },
+  { label: 'Assignments', icon: ClipboardList, suffix: 'assignments' },
+  { label: 'Attendance', icon: AlertTriangle, suffix: 'attendance' },
+  { label: 'Performance', icon: TrendingUp, suffix: 'performance' },
+  { label: 'Reports', icon: LineChart, suffix: 'reports' },
+];
 
 const ParentDashboard = () => {
   const [children, setChildren] = useState([]);
   const [overviews, setOverviews] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setError('');
         const childrenResponse = await parentApi.getChildren();
         const childList = childrenResponse.data?.data ?? [];
         setChildren(childList);
@@ -36,6 +46,7 @@ const ParentDashboard = () => {
         setNotifications(notificationsResponse.data?.data ?? []);
       } catch (error) {
         console.error('Failed to fetch parent dashboard data', error);
+        setError('We could not load the parent dashboard. Please check the connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -44,7 +55,36 @@ const ParentDashboard = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="p-6 text-slate-500">Loading parent dashboard...</div>;
+  if (loading) {
+    return (
+      <ParentPanel className="p-6">
+        <div className="h-2 w-32 rounded-md bg-slate-200" />
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="h-28 animate-pulse rounded-lg bg-slate-100" />
+          ))}
+        </div>
+      </ParentPanel>
+    );
+  }
+
+  if (error) {
+    return (
+      <ParentEmptyState
+        title="Parent dashboard unavailable"
+        description={error}
+        action={
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        }
+      />
+    );
+  }
 
   const totalPending = Object.values(overviews).reduce((sum, overview) => sum + Number(overview?.metrics?.pending_assignments || 0), 0);
   const attentionChildren = Object.values(overviews).filter((overview) => (overview?.alerts?.length || 0) > 0).length;
@@ -83,7 +123,7 @@ const ParentDashboard = () => {
                 <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="flex-1">
                   <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-400 text-white shadow-lg shadow-cyan-200/70">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
                       <Users size={24} />
                     </div>
                     <div>
@@ -92,25 +132,25 @@ const ParentDashboard = () => {
                         <ParentBadge tone="slate">{child.class_name || 'Class pending'}</ParentBadge>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {child.department_name || 'General'} • Student ID: {child.student_id} • Academic year {child.academic_year || 'current'}
+                        {child.department_name || 'General'} - Student ID: {child.student_id || 'Pending'} - Academic year {child.academic_year || 'current'}
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-4">
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Courses</p>
                       <p className="mt-2 text-2xl font-semibold text-blue-700">{metrics.active_courses ?? 0}</p>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Average Grade</p>
                       <p className="mt-2 text-2xl font-semibold text-emerald-700">{metrics.average_grade ?? 0}%</p>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Attendance</p>
                       <p className="mt-2 text-2xl font-semibold text-amber-700">{metrics.attendance_percentage ?? 0}%</p>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Pending</p>
                       <p className="mt-2 text-2xl font-semibold text-rose-700">{metrics.pending_assignments ?? 0}</p>
                     </div>
@@ -118,17 +158,17 @@ const ParentDashboard = () => {
                 </div>
 
                 <div className="w-full xl:max-w-sm">
-                  <div className="rounded-[1.6rem] border border-amber-200/80 bg-white/75 p-5 backdrop-blur-sm">
+                  <div className="rounded-lg border border-amber-200/80 bg-white/75 p-5 backdrop-blur-sm">
                     <ParentSectionHeading icon={AlertTriangle} title="Active Alerts" subtitle="Parent-facing reminders and risk warnings." />
                     <div className="mt-4 space-y-3">
                       {alerts.length > 0 ? (
                         alerts.slice(0, 4).map((alert, index) => (
-                          <div key={`${child.id}-${index}`} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                          <div key={`${child.id}-${index}`} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                             {alert}
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-2xl bg-emerald-50 px-4 py-6 text-sm font-medium text-emerald-700">
+                        <div className="rounded-lg bg-emerald-50 px-4 py-6 text-sm font-medium text-emerald-700">
                           No urgent alerts for this child.
                         </div>
                       )}
@@ -140,26 +180,25 @@ const ParentDashboard = () => {
 
               <div className="px-6 py-5">
                 <div className="flex flex-wrap gap-3">
-                  <Link to={`/parent/student/${child.id}/courses`} className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm">
-                    <BookOpen size={16} />
-                    Courses
-                  </Link>
-                  <Link to={`/parent/student/${child.id}/courses`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
-                    <BookOpen size={16} />
-                    Courses
-                  </Link>
-                  <Link to={`/parent/student/${child.id}/assignments`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
-                    <ClipboardList size={16} />
-                    Assignments
-                  </Link>
-                  <Link to={`/parent/student/${child.id}/attendance`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
-                    <AlertTriangle size={16} />
-                    Attendance
-                  </Link>
-                  <Link to={`/parent/student/${child.id}/reports`} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
-                    <Bell size={16} />
-                    Reports
-                  </Link>
+                  {childActions.map((action) => {
+                    const Icon = action.icon;
+                    const primary = action.tone === 'primary';
+
+                    return (
+                      <Link
+                        key={action.suffix}
+                        to={`/parent/student/${child.id}/${action.suffix}`}
+                        className={`inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition ${
+                          primary
+                            ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-800'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        <Icon size={16} />
+                        {action.label}
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             </ParentPanel>
@@ -187,17 +226,23 @@ const ParentDashboard = () => {
             }
           />
           <div className="mt-5 space-y-3">
-            {notifications.slice(0, 4).map((notification) => (
-              <div key={notification.id} className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-slate-900">{notification.title}</p>
-                  <ParentBadge tone={notification.is_read ? 'slate' : 'blue'}>
-                    {notification.is_read ? 'Read' : 'New'}
-                  </ParentBadge>
+            {notifications.length > 0 ? (
+              notifications.slice(0, 4).map((notification) => (
+                <div key={notification.id} className="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-900">{notification.title}</p>
+                    <ParentBadge tone={notification.is_read ? 'slate' : 'blue'}>
+                      {notification.is_read ? 'Read' : 'New'}
+                    </ParentBadge>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">{notification.message}</p>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{notification.message}</p>
+              ))
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                No parent notifications yet.
               </div>
-            ))}
+            )}
           </div>
         </ParentPanel>
 
@@ -208,12 +253,12 @@ const ParentDashboard = () => {
             subtitle="A quick pulse of the parent workspace."
           />
           <div className="mt-5 grid gap-4">
-            <div className="rounded-[1.4rem] bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Children with alerts</p>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Children with alerts</p>
               <p className="mt-2 text-3xl font-semibold text-slate-900">{attentionChildren}</p>
             </div>
-            <div className="rounded-[1.4rem] bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Latest notice</p>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Latest notice</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">{notifications[0]?.title || 'No notifications yet'}</p>
             </div>
           </div>
