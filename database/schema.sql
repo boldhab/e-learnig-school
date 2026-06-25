@@ -4,7 +4,7 @@ CREATE DATABASE IF NOT EXISTS millennium_db;
 USE millennium_db;
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS users, roles, login_logs, categories, materials, assignments, submissions, grades, discussion_groups, discussion_topics, discussion_messages, teacher_assignments, attendance_records, performance_reports, gap_analysis, notifications, announcements, faqs, support_tickets, support_ticket_replies, user_guides;
+DROP TABLE IF EXISTS users, roles, login_logs, categories, materials, assignments, submissions, grades, discussion_groups, discussion_topics, discussion_messages, teacher_assignments, attendance_records, performance_reports, gap_analysis, notifications, email_notification_logs, announcements, faqs, support_tickets, support_ticket_replies, user_guides;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Roles Table
@@ -234,6 +234,23 @@ CREATE TABLE IF NOT EXISTS notifications (
     priority ENUM('low', 'medium', 'high') DEFAULT 'medium',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Email Notification Logs Table
+CREATE TABLE IF NOT EXISTS email_notification_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    notification_type VARCHAR(100) NOT NULL,
+    recipient_user_id INT NOT NULL,
+    reference_type VARCHAR(50) NOT NULL,
+    reference_id INT NOT NULL,
+    context_hash VARCHAR(64) NOT NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    status ENUM('sent', 'failed') NOT NULL,
+    error_message TEXT DEFAULT NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_email_notification (notification_type, recipient_user_id, reference_type, reference_id, context_hash),
+    INDEX idx_email_notification_lookup (notification_type, recipient_user_id, reference_type, reference_id),
+    FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Announcements Table

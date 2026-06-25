@@ -156,17 +156,28 @@ class ParentService {
         $attendance = $this->getChildAttendance($parentId, $studentId);
         $performance = $this->getChildPerformance($parentId, $studentId);
         $courses = $this->parentRepository->getStudentCourses($studentId);
+        $gradeRows = $this->parentRepository->getStudentGradeReportRows($studentId);
+        $performanceReports = $this->parentRepository->getStudentPerformanceReports($studentId);
+        $recentAttendance = $this->parentRepository->getStudentRecentAttendanceRows($studentId, 20);
 
         return [
             'child' => $child,
-            'academic_report' => $performance['summary'],
+            'academic_report' => array_merge($performance['summary'], [
+                'grade_rows' => $gradeRows,
+                'performance_reports' => $performanceReports,
+                'graded_assignments' => count(array_filter($gradeRows, fn ($item) => ($item['report_status'] ?? '') === 'graded')),
+                'missing_assignments' => count(array_filter($gradeRows, fn ($item) => ($item['report_status'] ?? '') === 'missing')),
+                'submitted_assignments' => count(array_filter($gradeRows, fn ($item) => in_array(($item['report_status'] ?? ''), ['submitted', 'late', 'graded'], true))),
+            ]),
             'attendance_report' => [
                 'overall' => $attendance['summary']['overall'] ?? [],
                 'by_course' => $attendance['summary']['by_course'] ?? [],
                 'monthly_breakdown' => $attendance['monthly_breakdown'] ?? [],
+                'recent_records' => $recentAttendance,
                 'alerts' => $attendance['alerts'] ?? [],
             ],
             'courses' => $courses,
+            'generated_reports' => $performanceReports,
         ];
     }
 
@@ -197,7 +208,8 @@ class ParentService {
                 return [
                     'course_name' => $course['course_name'],
                     'teacher_name' => $course['teacher_name'],
-                    'average_grade' => (float) ($course['average_grade'] ?? 0),
+                    'average_grade' => $course['average_grade'] !== null ? (float) $course['average_grade'] : null,
+                    'graded_total' => (int) ($course['graded_total'] ?? 0),
                     'progress_percentage' => (float) ($course['assignments_total'] > 0
                         ? round(((int) $course['submissions_total'] / (int) $course['assignments_total']) * 100, 1)
                         : 0),

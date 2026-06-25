@@ -40,19 +40,53 @@ class GradingService {
         // Notify student immediately on grading
         $this->notificationService->notifyGradePublished($submission['student_id'], $submissionId, $submission['title']);
         
-        // Notify parents
+        // Notify parents and send emails
         $db = \App\Core\Database::getInstance();
-        $parentStmt = $db->prepare("SELECT parent_id FROM parent_student WHERE student_id = ?");
+        $mailService = new \App\Services\MailService();
+        $subject = "Grade Published: " . $submission['title'];
+
+        // 1. Get student info and send email
+        $studentStmt = $db->prepare("SELECT email, full_name FROM users WHERE id = ?");
+        $studentStmt->execute([$submission['student_id']]);
+        $studentInfo = $studentStmt->fetch(\PDO::FETCH_ASSOC);
+
+        if ($studentInfo && !empty($studentInfo['email'])) {
+            $studentBody = "Hello {$studentInfo['full_name']},\n\nYour grade for the assignment \"{$submission['title']}\" has been published.\nMarks: {$marks}/{$submission['max_marks']}\nFeedback: {$feedback}\n\nPlease check your portal for more details.\n\nThe Millennium School E-Learning System";
+            try {
+                $mailService->send($studentInfo['email'], $subject, $studentBody, $studentInfo['full_name']);
+            } catch (Exception $e) {
+                error_log("Grade email to student failed: " . $e->getMessage());
+            }
+        }
+
+        // 2. Get parents info, notify in-app, and send email
+        $parentStmt = $db->prepare("
+            SELECT p.id, p.email, p.full_name 
+            FROM parent_student ps 
+            JOIN users p ON ps.parent_id = p.id 
+            WHERE ps.student_id = ? AND p.status = 'active'
+        ");
         $parentStmt->execute([$submission['student_id']]);
-        $parentIds = $parentStmt->fetchAll(\PDO::FETCH_COLUMN);
-        foreach ($parentIds as $pid) {
+        $parentsInfo = $parentStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        foreach ($parentsInfo as $parent) {
             $this->notificationService->sendNotification(
-                $pid,
-                "Grade Published: " . $submission['title'],
+                $parent['id'],
+                $subject,
                 "Your child received a grade for " . $submission['title'] . ": {$marks}/{$submission['max_marks']}",
                 "grading",
                 "medium"
             );
+
+            if (!empty($parent['email'])) {
+                $studentName = $studentInfo ? $studentInfo['full_name'] : 'your child';
+                $parentBody = "Hello {$parent['full_name']},\n\n{$studentName} has received a grade for the assignment \"{$submission['title']}\".\nMarks: {$marks}/{$submission['max_marks']}\nFeedback: {$feedback}\n\nLog in to the parent portal for more details.\n\nThe Millennium School E-Learning System";
+                try {
+                    $mailService->send($parent['email'], $subject, $parentBody, $parent['full_name']);
+                } catch (Exception $e) {
+                    error_log("Grade email to parent failed: " . $e->getMessage());
+                }
+            }
         }
 
         return true;
