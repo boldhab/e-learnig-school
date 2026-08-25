@@ -220,10 +220,5 @@ npm run lint      # Run ESLint
 - **Student:** accesses courses, materials, assignments, submissions, grades, attendance, discussions, notifications, and help resources.
 - **Parent:** monitors linked students, academic progress, assignments, attendance, risk reports, and notifications.
 
-## Notes
-
-- The root `README.md` describes the full project. The `frontend/` directory also contains frontend-specific notes and quick-start documentation.
-- Some development helper scripts are included in the project root for database checks, attendance testing, token generation, and seeding sample attendance data.
-- Cloudinary, mail, Zoom, and broadcasting credentials are optional configuration areas depending on which modules are enabled in the deployment.
 
 
